@@ -1,0 +1,48 @@
+# name: 3rd_person_man_cp # rlgpu
+# channels:
+#   - pytorch
+#   - conda-forge
+#   - defaults
+# dependencies:
+#   - python=3.7
+#   # - pytorch=1.12
+#   # - torchvision=0.13
+#   - pytorch=1.8.1
+#   - torchvision=0.9.1
+#   - cudatoolkit=11.1
+#   - pyyaml>=5.3.1
+#   - scipy>=1.5.0
+#   - tensorboard>=2.2.1 # Lines including and above this are from isaacgym requirements
+#   - pip
+#   - opencv
+#   - isort
+#   - omegaconf
+#   - h5py
+#   - wandb
+#   - hydra-core
+#   - ipdb
+#   - pip:
+#     - ikpy
+#     - imageio
+#     - POT
+#     - scikit-image
+#     - scikit-learn
+#     - dm-env
+#     - info-nce-pytorch
+#     - gym
+#     - blosc
+#     - ipython
+
+name: rlgpu
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - pytorch=1.8.1
+  - torchvision=0.9.1
+  - cudatoolkit=11.1
+  - pyyaml>=5.3.1
+  - scipy>=1.5.0
+  - tensorboard>=2.2.1

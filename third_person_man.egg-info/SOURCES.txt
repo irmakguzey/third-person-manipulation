@@ -1,0 +1,6 @@
+README.md
+setup.py
+third_person_man.egg-info/PKG-INFO
+third_person_man.egg-info/SOURCES.txt
+third_person_man.egg-info/dependency_links.txt
+third_person_man.egg-info/top_level.txt
