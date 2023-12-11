@@ -41,8 +41,8 @@ class SimulationEnv:
         sim_params.physx.num_velocity_iterations = 1
         sim_params.physx.contact_offset = 0.01
         sim_params.physx.rest_offset = 0.0
-        compute_device_id = 0 # This is required for running the simulation on the background as well
-        graphics_device_id = -1
+        compute_device_id = 1 # This is required for running the simulation on the background as well
+        graphics_device_id = 1
         # Creating the sim with these parameters 
         self.sim = self.gym.create_sim(compute_device_id, graphics_device_id, physics_engine, sim_params)
         print('Simulation Created')
@@ -74,9 +74,8 @@ class SimulationEnv:
         table_asset_file = 'allegro_hand_description/urdf/table.urdf' # For now we only have the robot hand and a table
 
         self.actor_asset = self.gym.load_urdf(self.sim, asset_root, actor_asset_file, asset_options)
-        print('Loaded the actor')
+        print(f'  Loaded the actor at {actor_asset_file}')
         # self.table_asset = self.gym.load_urdf(self.sim, asset_root, table_asset_file, table_asset_options)
-
 
 
     def create_environment(self, spacing = 2.5): 
@@ -98,9 +97,10 @@ class SimulationEnv:
 
         # Get the indices / num dofs
         self.num_dofs = self.gym.get_asset_dof_count(self.actor_asset)
-        print(' Num DOFs: {}'.format(self.num_dofs))
+        print('  Num DOFs: {}'.format(self.num_dofs))
         actor_idx = self.gym.get_actor_index(self.env, self.actor_handle, gymapi.DOMAIN_SIM)
         self.actor_indices = [actor_idx]
+        print(' self.actor_indices: {}'.format(self.actor_indices))
 
         # Color the hand
         self.color_hand()
@@ -113,10 +113,10 @@ class SimulationEnv:
         props["armature"] = [0.001]*16
         props = self.set_control_mode(props = props, mode = 'Position_Velocity')
         self.gym.set_actor_dof_properties(self.env, self.actor_handle, props) 
-        print('End of Environment')
+        print('Environment created')
 
     def set_camera_params(self): 
-        print('** Creating camera sensors **')
+        print('  ** Creating camera sensors **')
         camera_props = gymapi.CameraProperties() 
         camera_props.horizontal_fov = 35
         camera_props.width = 480
@@ -125,15 +125,15 @@ class SimulationEnv:
 
         # Create the camera sensor
         self.camera_handle = self.gym.create_camera_sensor(self.env, camera_props) # To be used in receiving the camera image
-        print('Created camera sensor')
+        print('  Created camera sensor')
         camera_position = gymapi.Vec3(1.06,1.6 , -0.02) #Camera Position #gymapi.Vec3(1,1.2, 0.0)
         camera_target = gymapi.Vec3(1.03,1.3 , -0.02)   #Camera Target 
         
         # Actually set the camera position
         self.gym.set_camera_location(self.camera_handle, self.env, camera_position, camera_target)
-        print('Set camera location')
+        print('  Set camera location')
         self.gym.start_access_image_tensors(self.sim)   
-        print('Started access to image tensors')
+        print('  Started access to image tensors')
     
     def set_object_poses(self): 
         # Actor pose 
