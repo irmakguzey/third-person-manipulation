@@ -11,11 +11,18 @@ import torch
 class SimulationEnv: 
     def __init__(self, asset_root):
 
+        # Get asset file
+        self.asset_root = asset_root 
+        self.asset_file = "allegro_hand_description/urdf/model_only_hand.urdf"
+        self.table_asset= "allegro_hand_description/urdf/table.urdf"
+        self.cube_asset= "allegro_hand_description/urdf/cube_multicolor.urdf"
+        print("Loading asset '%s' from '%s'" % (self.asset_file, self.asset_root)) 
+
         # Create the simulation
         self.create_simulation()
 
         # Load the object / robot urdfs
-        self.load_urdfs(asset_root = asset_root)
+        self.load_urdfs()
 
         # Create the environment
         self.create_environment(spacing = 2.5)
@@ -44,8 +51,8 @@ class SimulationEnv:
         sim_params.physx.num_velocity_iterations = 1
         sim_params.physx.contact_offset = 0.01
         sim_params.physx.rest_offset = 0.0
-        compute_device_id = 1 # This is required for running the simulation on the background as well
-        graphics_device_id = 1
+        compute_device_id = 0 # This is required for running the simulation on the background as well
+        graphics_device_id = 0
         # Creating the sim with these parameters 
         self.sim = self.gym.create_sim(compute_device_id, graphics_device_id, physics_engine, sim_params)
         print('Simulation Created')
@@ -55,34 +62,13 @@ class SimulationEnv:
         self.gym.add_ground(self.sim, plane_params)
         print('Plane Added')
 
-    def load_urdfs(self, asset_root): 
+    def load_urdfs(self): 
 
         print('** Loading URDFs **')
 
-        # asset_options = gymapi.AssetOptions()
-        # asset_options.fix_base_link = True
-        # asset_options.flip_visual_attachments =  False #asset_descriptors[asset_id].flip_visual_attachments
-        # asset_options.use_mesh_materials = True
-        # asset_options.disable_gravity = True
-
-        # table_asset_options = gymapi.AssetOptions()
-        # table_asset_options.fix_base_link = True
-        # table_asset_options.flip_visual_attachments =  False #asset_descriptors[asset_id].flip_visual_attachments
-        # table_asset_options.collapse_fixed_joints = True
-        # table_asset_options.disable_gravity = True
-
-        # # print('table asset options: {}'.format(table_asset_options))
-
-        # actor_asset_file = 'allegro_hand_description/urdf/model_only_hand.urdf'
-        # table_asset_file = 'allegro_hand_description/urdf/table.urdf' # For now we only have the robot hand and a table
-
-        # self.actor_asset = self.gym.load_urdf(self.sim, asset_root, actor_asset_file, asset_options)
-        # print(f'  Loaded the actor at {actor_asset_file}')
-        # self.table_asset = self.gym.load_urdf(self.sim, asset_root, table_asset_file, table_asset_options)
-
-        asset_options = gymapi.AssetOptions() # NOTE: Test this
+        asset_options = gymapi.AssetOptions()
         asset_options.fix_base_link = True
-        asset_options.flip_visual_attachments =  False #asset_descriptors[self.asset_id].flip_visual_attachments
+        asset_options.flip_visual_attachments =  False 
         asset_options.use_mesh_materials = True
         asset_options.disable_gravity = True
         
@@ -91,13 +77,6 @@ class SimulationEnv:
         table_asset_options.flip_visual_attachments = False
         table_asset_options.collapse_fixed_joints = True
         table_asset_options.disable_gravity = True
-
-        # Get asset file
-        self.asset_root = "/home/irmak/Workspace/third-person-manipulation/third_person_man/models"
-        self.asset_file = "allegro_hand_description/urdf/model_only_hand.urdf"
-        self.table_asset= "allegro_hand_description/urdf/table.urdf"
-        self.cube_asset= "allegro_hand_description/urdf/cube_multicolor.urdf"
-        print("Loading asset '%s' from '%s'" % (self.asset_file, self.asset_root)) 
         
         self.actor_asset = self.gym.load_urdf(self.sim, self.asset_root, self.asset_file, asset_options)
         self.table_asset = self.gym.load_urdf(self.sim, self.asset_root, self.table_asset, table_asset_options)
@@ -155,8 +134,8 @@ class SimulationEnv:
         print('  Created camera sensor')
         
         # Actually set the camera position
-        camera_position = gymapi.Vec3(1.06,1.6 , -0.02)
-        camera_target = gymapi.Vec3(1.03,1.3 , -0.02)
+        camera_position = gymapi.Vec3(0.2, 3.0, 0.0)
+        camera_target = gymapi.Vec3(0.2, 1.5, 0.0)
         self.gym.set_camera_location(self.camera_handle, self.env, camera_position, camera_target)
         print('  Set camera location')
         self.gym.start_access_image_tensors(self.sim)   
@@ -165,18 +144,18 @@ class SimulationEnv:
     def set_poses(self): 
         # Actor pose 
         self.actor_pose = gymapi.Transform() 
-        self.actor_pose.p = gymapi.Vec3(1, 1.2, 0.0)
+        self.actor_pose.p = gymapi.Vec3(0.5, 1.5, 0.0)
         self.actor_pose.r = gymapi.Quat(-0.707, -0.707, 0, 0)
 
         # Table pose 
         self.table_pose = gymapi.Transform()
-        self.table_pose.p = gymapi.Vec3(0.7, 0.0, 0.3)
+        self.table_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
         self.table_pose.r = gymapi.Quat(-0.707107, 0.0, 0.0, 0.707107)
 
         # Object pose
         self.object_pose = gymapi.Transform()
         self.object_pose.p = gymapi.Vec3() 
-        self.object_pose.p.x =self.actor_pose.p.x
+        self.object_pose.p.x = self.actor_pose.p.x
         pose_dy, pose_dz = 0, -0.05
         self.object_pose.p.y = self.actor_pose.p.y + pose_dy
         self.object_pose.p.z = self.actor_pose.p.z + pose_dz
@@ -303,7 +282,6 @@ class SimulationEnv:
         )
         color_image = gymtorch.wrap_tensor(color_image)
         color_image = color_image.cpu().numpy()
-        print('color_image.shape: {}'.format(color_image.shape))
         color_image = color_image[:,:,[0,1,2]] # NOTE: Make sure that this is what is needed?
 
         return np.transpose(color_image, (2,0,1)) 
