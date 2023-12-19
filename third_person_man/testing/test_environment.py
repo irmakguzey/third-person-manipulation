@@ -25,6 +25,17 @@ def test_image(env):
     plt.savefig('ex_image.jpg')
 
 if __name__ == '__main__': 
-    env = test_env_initialization()
-    test_image(env)
+    # env = test_env_initialization()
+    # test_image(env)
+
+    env = FingertipMotionEnv(asset_root=None)
+    env.reset()
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import matplotlib
+    matplotlib.use('Agg')
+    color_image = env.render()
+    print('color_image.shape: {}'.format(color_image.shape))
+    plt.imshow(np.transpose(color_image, (1,2,0)) )
+    plt.savefig('ex_image_cube.jpg') 
     

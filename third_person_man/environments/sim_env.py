@@ -20,6 +20,9 @@ class SimulationEnv:
         # Create the environment
         self.create_environment(spacing = 2.5)
 
+        # Initialize State Vectors
+        self.initialize_states()
+
     def create_simulation(self): 
         print('** Creating Simulation **')
         
@@ -56,27 +59,51 @@ class SimulationEnv:
 
         print('** Loading URDFs **')
 
-        asset_options = gymapi.AssetOptions()
+        # asset_options = gymapi.AssetOptions()
+        # asset_options.fix_base_link = True
+        # asset_options.flip_visual_attachments =  False #asset_descriptors[asset_id].flip_visual_attachments
+        # asset_options.use_mesh_materials = True
+        # asset_options.disable_gravity = True
+
+        # table_asset_options = gymapi.AssetOptions()
+        # table_asset_options.fix_base_link = True
+        # table_asset_options.flip_visual_attachments =  False #asset_descriptors[asset_id].flip_visual_attachments
+        # table_asset_options.collapse_fixed_joints = True
+        # table_asset_options.disable_gravity = True
+
+        # # print('table asset options: {}'.format(table_asset_options))
+
+        # actor_asset_file = 'allegro_hand_description/urdf/model_only_hand.urdf'
+        # table_asset_file = 'allegro_hand_description/urdf/table.urdf' # For now we only have the robot hand and a table
+
+        # self.actor_asset = self.gym.load_urdf(self.sim, asset_root, actor_asset_file, asset_options)
+        # print(f'  Loaded the actor at {actor_asset_file}')
+        # self.table_asset = self.gym.load_urdf(self.sim, asset_root, table_asset_file, table_asset_options)
+
+        asset_options = gymapi.AssetOptions() # NOTE: Test this
         asset_options.fix_base_link = True
-        asset_options.flip_visual_attachments =  False #asset_descriptors[asset_id].flip_visual_attachments
+        asset_options.flip_visual_attachments =  False #asset_descriptors[self.asset_id].flip_visual_attachments
         asset_options.use_mesh_materials = True
         asset_options.disable_gravity = True
-
+        
         table_asset_options = gymapi.AssetOptions()
         table_asset_options.fix_base_link = True
-        table_asset_options.flip_visual_attachments =  False #asset_descriptors[asset_id].flip_visual_attachments
+        table_asset_options.flip_visual_attachments = False
         table_asset_options.collapse_fixed_joints = True
         table_asset_options.disable_gravity = True
 
-        # print('table asset options: {}'.format(table_asset_options))
+        # Get asset file
+        self.asset_root = "/home/aadhithya/tactile-learning/envs/dexterous_env/urdf"
+        self.asset_file = "allegro_hand_description/urdf/model_only_hand.urdf"
+        self.table_asset= "allegro_hand_description/urdf/table.urdf"
+        self.cube_asset= "allegro_hand_description/urdf/cube_multicolor.urdf"
+        print("Loading asset '%s' from '%s'" % (self.asset_file, self.asset_root)) 
+        
+        self.actor_asset = self.gym.load_urdf(self.sim, self.asset_root, self.asset_file, asset_options)
+        self.table_asset = self.gym.load_urdf(self.sim, self.asset_root, self.table_asset, table_asset_options)
 
-        actor_asset_file = 'allegro_hand_description/urdf/model_only_hand.urdf'
-        table_asset_file = 'allegro_hand_description/urdf/table.urdf' # For now we only have the robot hand and a table
-
-        self.actor_asset = self.gym.load_urdf(self.sim, asset_root, actor_asset_file, asset_options)
-        print(f'  Loaded the actor at {actor_asset_file}')
-        # self.table_asset = self.gym.load_urdf(self.sim, asset_root, table_asset_file, table_asset_options)
-
+        object_asset_options = gymapi.AssetOptions()
+        self.object_asset= self.gym.load_urdf(self.sim, self.asset_root, self.cube_asset,object_asset_options)
 
     def create_environment(self, spacing = 2.5): 
         print('** Creating Environment **')
@@ -88,19 +115,19 @@ class SimulationEnv:
         self.env = self.gym.create_env(self.sim, env_lower, env_upper, 1) # We will only have 1 environment anyways so setting the number of rows to 1
 
         # Set the camera parameters 
-        self.set_camera_params()
+        self.create_camera_sensors()
 
         # Create the object handlers to control each component
-        self.set_object_poses()
+        self.set_poses()
         self.actor_handle = self.gym.create_actor(self.env, self.actor_asset, self.actor_pose, 'actor', 0, 1)
-        # self.table_handle = self.gym.create_actor(self.env, self.table_asset, self.table_pose, 'table', 0, 1)
+        self.table_handle = self.gym.create_actor(self.env, self.table_asset, self.table_pose, 'table', 0, 1)
+        self.object_handle = self.gym.create_actor(self.env, self.object_asset, self.object_pose, 'cube', 0, 0, 0)
 
         # Get the indices / num dofs
         self.num_dofs = self.gym.get_asset_dof_count(self.actor_asset)
         print('  Num DOFs: {}'.format(self.num_dofs))
-        actor_idx = self.gym.get_actor_index(self.env, self.actor_handle, gymapi.DOMAIN_SIM)
-        self.actor_indices = [actor_idx]
-        print(' self.actor_indices: {}'.format(self.actor_indices))
+        self.actor_idx = self.gym.get_actor_index(self.env, self.actor_handle, gymapi.DOMAIN_SIM)
+        self.object_idx = self.gym.get_actor_index(self.env, self.object_handle, gymapi.DOMAIN_SIM)
 
         # Color the hand
         self.color_hand()
@@ -115,7 +142,7 @@ class SimulationEnv:
         self.gym.set_actor_dof_properties(self.env, self.actor_handle, props) 
         print('Environment created')
 
-    def set_camera_params(self): 
+    def create_camera_sensors(self): 
         print('  ** Creating camera sensors **')
         camera_props = gymapi.CameraProperties() 
         camera_props.horizontal_fov = 35
@@ -126,16 +153,16 @@ class SimulationEnv:
         # Create the camera sensor
         self.camera_handle = self.gym.create_camera_sensor(self.env, camera_props) # To be used in receiving the camera image
         print('  Created camera sensor')
-        camera_position = gymapi.Vec3(1.06,1.6 , -0.02) #Camera Position #gymapi.Vec3(1,1.2, 0.0)
-        camera_target = gymapi.Vec3(1.03,1.3 , -0.02)   #Camera Target 
         
         # Actually set the camera position
+        camera_position = gymapi.Vec3(1.06,1.6 , -0.02)
+        camera_target = gymapi.Vec3(1.03,1.3 , -0.02)
         self.gym.set_camera_location(self.camera_handle, self.env, camera_position, camera_target)
         print('  Set camera location')
         self.gym.start_access_image_tensors(self.sim)   
         print('  Started access to image tensors')
     
-    def set_object_poses(self): 
+    def set_poses(self): 
         # Actor pose 
         self.actor_pose = gymapi.Transform() 
         self.actor_pose.p = gymapi.Vec3(1, 1.2, 0.0)
@@ -145,6 +172,18 @@ class SimulationEnv:
         self.table_pose = gymapi.Transform()
         self.table_pose.p = gymapi.Vec3(0.7, 0.0, 0.3)
         self.table_pose.r = gymapi.Quat(-0.707107, 0.0, 0.0, 0.707107)
+
+        # Object pose
+        self.object_pose = gymapi.Transform()
+        self.object_pose.p = gymapi.Vec3() 
+        self.object_pose.p.x =self.actor_pose.p.x
+        pose_dy, pose_dz = 0, -0.05
+        self.object_pose.p.y = self.actor_pose.p.y + pose_dy
+        self.object_pose.p.z = self.actor_pose.p.z + pose_dz
+
+    def initialize_states(self): 
+        self.root_state_tensor = gymtorch.wrap_tensor(self.gym.acquire_actor_root_state_tensor(self.sim)).view(-1,13)
+        print('Root state tensor: {}'.format(self.root_state_tensor))
 
     def color_hand(self): 
         for j in range(self.num_dofs+13):   
@@ -166,7 +205,7 @@ class SimulationEnv:
         return props
     
     # Set Hand position
-    def set_hand_position(self, position):
+    def set_hand_position(self, position): # position: (1,16)
         self.gym.set_dof_position_target_tensor(self.sim,  gymtorch.unwrap_tensor(position))
 
     # Set Hand velocity
@@ -201,27 +240,43 @@ class SimulationEnv:
         return position
     
     def get_endeff_state(self): 
-        root_state_tensor = gymtorch.wrap_tensor(self.gym.acquire_actor_root_state_tensor(self.sim))
-        return root_state_tensor.view(-1, 13)
-    
+        self.root_state_tensor = gymtorch.wrap_tensor(self.gym.acquire_actor_root_state_tensor(self.sim)).view(-1,13)
+        endeff_state = self.root_state_tensor[self.actor_idx,:]
+        return endeff_state
+
     def set_endeff_position(self, position): # 7 dimensional position for the root tensor, 3 translation, 4 rotation 
-        self.endeff_state[0,:7] = to_torch(np.array(position), device='cpu')
-        self.actor_indices=to_torch(self.actor_indices, dtype=torch.int32, device='cpu')
+        self.root_state_tensor[self.actor_idx, :7] = to_torch(np.array(position), device='cpu')
+        actor_indices = to_torch([self.actor_idx], dtype=torch.int32, device='cpu')
         self.gym.set_actor_root_state_tensor_indexed(
             self.sim,
-            gymtorch.unwrap_tensor(self.endeff_state),
+            gymtorch.unwrap_tensor(self.root_state_tensor),
+            gymtorch.unwrap_tensor(actor_indices), # NOTE: actor_indices is different than object_indices
+            len(actor_indices)
+        )
+
+    def set_endeff_velocity(self, velocity): # 6 dimensional velocity, for orientation velocity is 3
+        self.root_state_tensor[self.actor_idx, 7:] = to_torch(np.array(velocity), device='cpu') 
+        self.actor_indices=to_torch([self.actor_idx], dtype=torch.int32, device='cpu')
+        self.gym.set_actor_root_state_tensor_indexed(
+            self.sim,
+            gymtorch.unwrap_tensor(self.root_state_tensor),
             gymtorch.unwrap_tensor(self.actor_indices),
             len(self.actor_indices)
         )
 
-    def set_endeff_velocity(self, velocity): # 6 dimensional velocity, for orientation velocity is 3
-        self.endeff_state[0,7:] = to_torch(np.array(velocity), device='cpu') 
-        self.actor_indices=to_torch(self.actor_indices, dtype=torch.int32, device='cpu')
+    def get_object_state(self):
+        self.root_state_tensor = gymtorch.wrap_tensor(self.gym.acquire_actor_root_state_tensor(self.sim)).view(-1,13)
+        object_state = self.root_state_tensor[self.object_idx, :]
+        return object_state
+
+    def set_object_position(self, position):
+        self.root_state_tensor[self.object_idx, :7] = to_torch(np.array(position), device='cpu')
+        object_indices = to_torch([self.object_idx], dtype=torch.int32, device='cpu')
         self.gym.set_actor_root_state_tensor_indexed(
-            self.sim,
-            gymtorch.unwrap_tensor(self.endeff_state),
-            gymtorch.unwrap_tensor(self.actor_indices),
-            len(self.actor_indices)
+            self.sim, 
+            gymtorch.unwrap_tensor(self.root_state_tensor),
+            gymtorch.unwrap_tensor(object_indices),
+            len(object_indices)
         )
 
     # Get DOF lower limits
