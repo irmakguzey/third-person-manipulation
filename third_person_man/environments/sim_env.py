@@ -93,7 +93,7 @@ class SimulationEnv:
         table_asset_options.disable_gravity = True
 
         # Get asset file
-        self.asset_root = "/home/aadhithya/tactile-learning/envs/dexterous_env/urdf"
+        self.asset_root = "/home/irmak/Workspace/third-person-manipulation/third_person_man/models"
         self.asset_file = "allegro_hand_description/urdf/model_only_hand.urdf"
         self.table_asset= "allegro_hand_description/urdf/table.urdf"
         self.cube_asset= "allegro_hand_description/urdf/cube_multicolor.urdf"
