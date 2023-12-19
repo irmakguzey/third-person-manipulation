@@ -12,38 +12,18 @@ class CubeFlippingSim():
                 sim_params = gymapi.SimParams()
                 physics_engine=gymapi.SIM_PHYSX
                 self.gym=gymapi.acquire_gym()
-                #print(num_envs)
-                # self.num_envs=num_envs
-                # self.is_kinova=False
-                # super().__init__(**kwargs)
+                
                 self.num_per_row=num_per_row
                 self.spacing=spacing
-                # self.show_axis=show_axis
-                # self.name="Allegro_Sim"
-                # #Log specific parameters 
-                # self.log_file=log_file
-                # self.log_conf=log_conf
-                # self.full_log= full_log
-                # #Env specific parameters
+                
                 self.env_lower = gymapi.Vec3(-self.spacing, 0.0, -self.spacing)
                 self.env_upper = gymapi.Vec3(self.spacing, self.spacing, self.spacing)
-                # self.envs=[]
-                # self.actor_handles=[]
-                # self.attractor_handles = {}
-                # self.base_poses = []
+                
                 self.object_indices=[]
-                # self.act_moving_average=1.0
-                # self.actor_indices=[]
-                # self.device="cuda:1"
+                
                 self.device = "cpu"
-                # self.axes_geom = gymutil.AxesGeometry(0.1)
-                # self.env_suite=env_suite
-               
+                
                 self.control_mode=control_mode
-                # self.cnt=2
-                # self._stream_oculus= True
-
-              
 
         # set common parameters
                 sim_params.dt = self.dt= 1/60

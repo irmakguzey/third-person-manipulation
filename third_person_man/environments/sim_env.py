@@ -13,11 +13,7 @@ class SimulationEnv:
 
         # Get asset file
         self.asset_root = asset_root 
-        self.asset_file = "allegro_hand_description/urdf/model_only_hand.urdf"
-        self.table_asset= "allegro_hand_description/urdf/table.urdf"
-        self.cube_asset= "allegro_hand_description/urdf/cube_multicolor.urdf"
-        print("Loading asset '%s' from '%s'" % (self.asset_file, self.asset_root)) 
-
+        
         # Create the simulation
         self.create_simulation()
 
@@ -63,26 +59,7 @@ class SimulationEnv:
         print('Plane Added')
 
     def load_urdfs(self): 
-
-        print('** Loading URDFs **')
-
-        asset_options = gymapi.AssetOptions()
-        asset_options.fix_base_link = True
-        asset_options.flip_visual_attachments =  False 
-        asset_options.use_mesh_materials = True
-        asset_options.disable_gravity = True
-        
-        table_asset_options = gymapi.AssetOptions()
-        table_asset_options.fix_base_link = True
-        table_asset_options.flip_visual_attachments = False
-        table_asset_options.collapse_fixed_joints = True
-        table_asset_options.disable_gravity = True
-        
-        self.actor_asset = self.gym.load_urdf(self.sim, self.asset_root, self.asset_file, asset_options)
-        self.table_asset = self.gym.load_urdf(self.sim, self.asset_root, self.table_asset, table_asset_options)
-
-        object_asset_options = gymapi.AssetOptions()
-        self.object_asset= self.gym.load_urdf(self.sim, self.asset_root, self.cube_asset,object_asset_options)
+        return NotImplementedError
 
     def create_environment(self, spacing = 2.5): 
         print('** Creating Environment **')
@@ -96,17 +73,8 @@ class SimulationEnv:
         # Set the camera parameters 
         self.create_camera_sensors()
 
-        # Create the object handlers to control each component
-        self.set_poses()
-        self.actor_handle = self.gym.create_actor(self.env, self.actor_asset, self.actor_pose, 'actor', 0, 1)
-        self.table_handle = self.gym.create_actor(self.env, self.table_asset, self.table_pose, 'table', 0, 1)
-        self.object_handle = self.gym.create_actor(self.env, self.object_asset, self.object_pose, 'cube', 0, 0, 0)
-
-        # Get the indices / num dofs
-        self.num_dofs = self.gym.get_asset_dof_count(self.actor_asset)
-        print('  Num DOFs: {}'.format(self.num_dofs))
-        self.actor_idx = self.gym.get_actor_index(self.env, self.actor_handle, gymapi.DOMAIN_SIM)
-        self.object_idx = self.gym.get_actor_index(self.env, self.object_handle, gymapi.DOMAIN_SIM)
+        # Create handlers
+        self.create_handlers_and_indices()
 
         # Color the hand
         self.color_hand()
@@ -121,44 +89,11 @@ class SimulationEnv:
         self.gym.set_actor_dof_properties(self.env, self.actor_handle, props) 
         print('Environment created')
 
-    def create_camera_sensors(self): 
-        print('  ** Creating camera sensors **')
-        camera_props = gymapi.CameraProperties() 
-        camera_props.horizontal_fov = 35
-        camera_props.width = 480
-        camera_props.height = 480
-        camera_props.enable_tensors = True
-
-        # Create the camera sensor
-        self.camera_handle = self.gym.create_camera_sensor(self.env, camera_props) # To be used in receiving the camera image
-        print('  Created camera sensor')
-        
-        # Actually set the camera position
-        camera_position = gymapi.Vec3(0.2, 3.0, 0.0)
-        camera_target = gymapi.Vec3(0.2, 1.5, 0.0)
-        self.gym.set_camera_location(self.camera_handle, self.env, camera_position, camera_target)
-        print('  Set camera location')
-        self.gym.start_access_image_tensors(self.sim)   
-        print('  Started access to image tensors')
+    def create_camera_sensors(self):
+        return NotImplementedError
     
-    def set_poses(self): 
-        # Actor pose 
-        self.actor_pose = gymapi.Transform() 
-        self.actor_pose.p = gymapi.Vec3(0.5, 1.5, 0.0)
-        self.actor_pose.r = gymapi.Quat(-0.707, -0.707, 0, 0)
-
-        # Table pose 
-        self.table_pose = gymapi.Transform()
-        self.table_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
-        self.table_pose.r = gymapi.Quat(-0.707107, 0.0, 0.0, 0.707107)
-
-        # Object pose
-        self.object_pose = gymapi.Transform()
-        self.object_pose.p = gymapi.Vec3() 
-        self.object_pose.p.x = self.actor_pose.p.x
-        pose_dy, pose_dz = 0, -0.05
-        self.object_pose.p.y = self.actor_pose.p.y + pose_dy
-        self.object_pose.p.z = self.actor_pose.p.z + pose_dz
+    def create_handlers_and_indices(self): 
+        return NotImplementedError
 
     def initialize_states(self): 
         self.root_state_tensor = gymtorch.wrap_tensor(self.gym.acquire_actor_root_state_tensor(self.sim)).view(-1,13)
@@ -314,4 +249,51 @@ class SimulationEnv:
     
     def render(self): 
         return self.get_image()
+
+    # This Function is used for resetting the Environment
+    def reset(self):
+        # Reset
+        self.set_hand_position(self.hand_home_state)  
+        self.set_object_position(self.object_home_state)
+        self.set_endeff_position(self.endeff_home_state)
+        
+        # Code For Simulating and Stepping Graphics
+        self.simulate_and_render()
+                
+        # Get Observation
+        obs = {}
+        obs['pixels'] = self.compute_observation(obs_type = 'image') 
+        obs['features'] = self.compute_observation(obs_type = 'position')
+        print('AFTER RESET OBS: {} | {}'.format(obs['pixels'].shape, obs['features'].shape))
+        
+        return obs
+
+    def step(self, action): # NOTE: This code piece is for moving the robot with positions
+
+        # Set the action position to the desired ones
+        action = to_torch(action, dtype=torch.float, device='cpu') 
+
+        self.set_hand_position(action[:-7]) # NOTE: This might cause a problem anyways
+        self.set_endeff_position(action[-7:])
+        
+        # Simulate and render
+        self.simulate_and_render()
+        
+        # Compute observations
+        obs = {}
+        obs['pixels'] = self.compute_observation(obs_type = 'image') 
+        obs['features'] = self.compute_observation(obs_type = 'position')
+        print('AFTER STEP OBS: {} | {}'.format(obs['pixels'].shape, obs['features'].shape))
+
+        reward, done, infos = 0, False, {'is_success': False} 
+        
+        return obs, done, reward, infos
+    
+    def simulate_and_render(self): 
+        self.gym.simulate(self.sim)
+        self.gym.fetch_results(self.sim, True)
+        self.gym.refresh_dof_state_tensor(self.sim)   
+        self.gym.step_graphics(self.sim)
+        self.gym.render_all_camera_sensors(self.sim)
+        self.gym.draw_viewer(self.viewer, self.sim, False)
         
