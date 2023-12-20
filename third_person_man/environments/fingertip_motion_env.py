@@ -8,9 +8,11 @@ import math
 import numpy as np 
 import torch
 
-from .sim_env import SimulationEnv
+from .dexterous_simulation_env import DexterousSimulationEnv
 
-class FingertipMotionEnv(SimulationEnv):
+# TODO: Should change this
+
+class FingertipMotionEnv(DexterousSimulationEnv):
     def __init__(self, asset_root): 
         super().__init__(asset_root=asset_root)
 

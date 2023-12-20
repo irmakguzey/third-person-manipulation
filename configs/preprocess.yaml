@@ -3,7 +3,7 @@ preprocessor_module:
   data_path: /data/third_person_manipulation/sim_cube_flipping
   modules:
     robot: ${robot_cfg}
-    # image: ${image_cfg} # - this is only for tactile training
+    image: ${image_cfg} # - this is only for tactile training
     # tactile: ${tactile_cfg}
   dump_data_indices: true
   process_single_demo: false
@@ -20,7 +20,7 @@ robot_cfg:
 image_cfg:
   _target_: third_person_man.preprocess.ImagePreprocessor
   camera_id: 0
-  is_ssl: true
+  is_ssl: false
   # time_difference: 1 # If the there is no set time difference we will not apply preprocessing for images
 
 tactile_cfg:

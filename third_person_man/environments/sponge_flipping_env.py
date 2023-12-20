@@ -8,7 +8,7 @@ import math
 import numpy as np 
 import torch
 
-from .sim_env import SimulationEnv
+from .dexterous_simulation_env import SimulationEnv
 
 class SpongeFlippingEnv(SimulationEnv):
     def __init__(self, asset_root): 
