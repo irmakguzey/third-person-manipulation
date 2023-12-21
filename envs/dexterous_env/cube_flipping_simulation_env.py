@@ -11,8 +11,8 @@ import torch
 from .dexterous_simulation_env import DexterousSimulationEnv
 
 class CubeFlippingEnv(DexterousSimulationEnv):
-    def __init__(self, asset_root): 
-        super().__init__(asset_root=asset_root)
+    def __init__(self): 
+        super().__init__()
 
         self.set_home_state()
         self.viewer = None
@@ -26,14 +26,13 @@ class CubeFlippingEnv(DexterousSimulationEnv):
             0.08261403, -0.15844858, 0.82595366, 0.7666822 ]]) 
         
         self.object_home_state = torch.tensor([0.19, 1.51, -0.03, 0, 0, 0, 1])
-        # self.object_home_state = torch.tensor([0.15, 1.55, -0.0, 0, 0, 0, 1])
         self.endeff_home_state = torch.tensor([0.2, 1.5, 0.0, 0, 0, 0.7071068, 0.7071068 ]) 
 
     def load_urdfs(self): 
         print('** Loading URDFs **')
-        actor_asset_file = "allegro_hand_description/urdf/model_only_hand.urdf"
+        actor_asset_file = "allegro_hand_description/urdf/model_new_final.urdf"
         table_asset_file = "allegro_hand_description/urdf/table.urdf"
-        cube_asset_file = "allegro_hand_description/urdf/cube_multicolor.urdf"
+        cube_asset_file = "allegro_hand_description/urdf/cube_multicolor_large.urdf"
 
         asset_options = gymapi.AssetOptions()
         asset_options.fix_base_link = True

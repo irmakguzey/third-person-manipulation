@@ -3,6 +3,13 @@ trajectory_replay:
   demo_num: 1
   representations: ['image', 'allegro']
   env_cfg: 
-    _target_: third_person_man.environments.cube_flipping_env.CubeFlippingEnv
-    asset_root: /home/irmak/Workspace/third-person-manipulation/models
+    _target_: dexterous_env.cube_flipping_with_arm_simulation_env.CubeFlippingArmEnv
+    # asset_root: /home/irmak/Workspace/third-person-manipulation/models
+
+fingertip_replay:
+  data_path: /data/third_person_manipulation/sim_cube_flipping
+  demo_num: 1
+  representations: ['image', 'allegro']
+  env_cfg: 
+    _target_: dexterous_env.fingertip_motion_env.FingertipMotionEnv
   

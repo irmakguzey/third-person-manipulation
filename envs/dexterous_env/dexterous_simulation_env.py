@@ -8,16 +8,18 @@ import math
 import numpy as np
 import torch
 
-import os 
+from pathlib import Path
 
+import os 
 os.environ['MESA_VK_DEVICE_SELECT'] = '10de:24b0'
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
+
 class DexterousSimulationEnv: 
-    def __init__(self, asset_root):
+    def __init__(self, **kwargs):
 
         # Get asset file
-        self.asset_root = asset_root 
+        self.asset_root = str(Path.cwd() / 'models')
         
         # Create the simulation
         self.create_simulation()
@@ -54,6 +56,7 @@ class DexterousSimulationEnv:
         sim_params.physx.rest_offset = 0.0
         compute_device_id = 0 # This is required for running the simulation on the background as well
         graphics_device_id = 0
+        self.device = f'cuda:{compute_device_id}'
         # Creating the sim with these parameters 
         self.sim = self.gym.create_sim(compute_device_id, graphics_device_id, physics_engine, sim_params)
         print('Simulation Created')
@@ -86,10 +89,10 @@ class DexterousSimulationEnv:
 
         # Set the actor properties such as stiffness / damping and etc 
         props = self.gym.get_actor_dof_properties(self.env, self.actor_handle)
-        props["stiffness"] =[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3]
-        props["damping"] =  [0.1,0.1,0.1,0.1,0.1,0,1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]
-        props["friction"] = [0.01]*16
-        props["armature"] = [0.001]*16
+        props["stiffness"] =[3] * self.num_dofs
+        props["damping"] =  [0.1] * self.num_dofs
+        props["friction"] = [0.01] * self.num_dofs
+        props["armature"] = [0.001] * self.num_dofs
         props = self.set_control_mode(props = props, mode = 'Position_Velocity')
         self.gym.set_actor_dof_properties(self.env, self.actor_handle, props) 
         print('Environment created')
@@ -241,21 +244,22 @@ class DexterousSimulationEnv:
             hand_position = self.get_hand_position() 
             endeff_position = self.get_endeff_position()
             position = np.concatenate([hand_position, endeff_position], axis=0)
-            print('position.shape: {}'.format(position.shape))
+            # print('position.shape: {}'.format(position.shape))
             return position
     
         if obs_type == 'velocity': 
             hand_velocity = self.get_hand_velocity()
             endeff_velocity = self.get_endeff_velocity()
             velocity = np.concatenate([hand_velocity, endeff_velocity], axis=0)
-            print('velocity.shape: {}'.format(velocity.shape))
+            # print('velocity.shape: {}'.format(velocity.shape))
 
             return velocity 
         
         return None
     
-    def render(self): 
-        return self.get_image()
+    def render(self, mode='rgb_array', width=480, height=480): 
+        image = self.get_image()
+        return np.reshape(image, (width, height)) # NOTE: Make sure this is accurate
 
     # This Function is used for resetting the Environment
     def reset(self):

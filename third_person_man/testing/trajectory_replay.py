@@ -1,4 +1,5 @@
 # Script to replay a saved trajectory on the simulation environment and then save it to a video
+import os
 import glob 
 import hydra 
 import matplotlib.pyplot as plt
@@ -19,26 +20,23 @@ class TrajectoryReplay:
         roots = glob.glob(f'{data_path}/demonstration_*')
         self.data = load_data(roots=roots, demos_to_use=[demo_num], representations=representations)
         self.state_id = 0
-        # print('self.env: {}'.format(self.env))
 
         # Test if the initialization is proper
         obs = self.env.reset()
         plt.imshow(np.transpose(obs['pixels'], (1,2,0)))
-        plt.savefig('outs/trajectory_replay/reset_obs.jpg')
+        work_dir = os.path.dirname(__file__)
+        plt.savefig(f'{work_dir}/outs/trajectory_replay/reset_obs_small.jpg')
 
         # Initialize the video recorder
         from third_person_man.utils import VideoRecorder
-        work_dir = Path.cwd()
         self.video_recorder = VideoRecorder(
             save_dir = Path(work_dir) / 'outs/trajectory_replay',
         )
-
 
     def save_timestep(self, state_id): 
         # Get the action from the data
         demo_id, action_id = self.data['hand_actions']['indices'][state_id]
         hand_action = self.data['hand_actions']['values'][demo_id][action_id]
-        # print('hand_action: {}'.format(hand_action))        
         action = np.concatenate([hand_action, np.zeros(7)], axis=0)
 
         # Apply to the environment
@@ -51,7 +49,7 @@ class TrajectoryReplay:
             obs = obs['pixels']
         )
 
-    def save_trajectory(self):
+    def save_trajectory(self, title='cube_flipping_trajectory_endeff.mp4'):
         obs = self.env.reset()
         print('obs.shape: {}'.format(obs["pixels"].shape))
         print('obs.features after resetting: {}'.format(obs["features"]))
@@ -61,10 +59,7 @@ class TrajectoryReplay:
             print(f'State ID: {state_id}')
             self.save_timestep(state_id)
 
-            # return
-            
-
-        self.video_recorder.save(f'cube_flipping_trajectory_failure.mp4')
+        self.video_recorder.save(title)
 
 
 @hydra.main(version_base=None, config_path='../../configs', config_name='testing')

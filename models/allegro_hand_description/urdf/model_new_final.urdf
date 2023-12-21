@@ -45,7 +45,7 @@
  <link name="kinova_link_base">
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/base_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/base.obj"/>
       </geometry>
       <material name="carbon_fiber">
        <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -66,7 +66,7 @@
   <link name="kinova_link_1">
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/shoulder_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/shoulder.obj"/>
       </geometry>
       <material name="carbon_fiber">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -74,7 +74,7 @@
     </visual>
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/ring_big_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/ring_big.obj"/>
       </geometry>
         <material name="white">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -102,7 +102,7 @@
   <link name="kinova_link_2">
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/arm_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/arm.obj"/>
       </geometry>
       <material name="carbon_fiber">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -110,7 +110,7 @@
     </visual>
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/ring_big_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/ring_big.obj"/>
       </geometry>
        <material name="white">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -138,7 +138,7 @@
   <link name="kinova_link_3">
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/forearm_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/forearm.obj"/>
       </geometry>
       <material name="carbon_fiber">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -146,7 +146,7 @@
     </visual>
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/ring_big_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/ring_big.obj"/>
       </geometry>
        <material name="white">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -174,7 +174,7 @@
   <link name="kinova_link_4">
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/wrist_spherical_1_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/wrist_spherical_1.obj"/>
       </geometry>
       <material name="carbon_fiber">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -182,7 +182,7 @@
     </visual>
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/ring_small_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/ring_small.obj"/>
       </geometry>
        <material name="white">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -210,7 +210,7 @@
   <link name="kinova_link_5">
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/wrist_spherical_2_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/wrist_spherical_2.obj"/>
       </geometry>
       <material name="carbon_fiber">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
@@ -218,7 +218,7 @@
     </visual>
     <visual>
       <geometry>
-        <mesh filename="package://kinova_description/meshes/ring_small_smoothed.obj"/>
+        <mesh filename="package://kinova_description/meshes/ring_small.obj"/>
       </geometry>
        <material name="white">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
