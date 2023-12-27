@@ -14,7 +14,6 @@ import os
 os.environ['MESA_VK_DEVICE_SELECT'] = '10de:24b0'
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
-
 class DexterousSimulationEnv: 
     def __init__(self, **kwargs):
 

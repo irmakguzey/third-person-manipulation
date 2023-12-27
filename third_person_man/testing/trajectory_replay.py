@@ -7,10 +7,12 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 
+from tqdm import tqdm
+
 from pathlib import Path
 
 class TrajectoryReplay:
-    def __init__(self, data_path, demo_num, representations, env_cfg):
+    def __init__(self, data_path, demo_num, representations, env_cfg, module_name='trajectory_replay'):
 
         # Initialize the environment required
         self.env = hydra.utils.instantiate(env_cfg) 
@@ -21,17 +23,19 @@ class TrajectoryReplay:
         self.data = load_data(roots=roots, demos_to_use=[demo_num], representations=representations)
         self.state_id = 0
 
-        # Test if the initialization is proper
         obs = self.env.reset()
-        plt.imshow(np.transpose(obs['pixels'], (1,2,0)))
-        work_dir = os.path.dirname(__file__)
-        plt.savefig(f'{work_dir}/outs/trajectory_replay/reset_obs_small.jpg')
-
         # Initialize the video recorder
         from third_person_man.utils import VideoRecorder
+        work_dir = os.path.dirname(__file__)
         self.video_recorder = VideoRecorder(
-            save_dir = Path(work_dir) / 'outs/trajectory_replay',
+            save_dir = Path(work_dir) / f'outs/{module_name}',
+            fps = 20
         )
+
+        # Test if the initialization is proper
+        plt.imshow(np.transpose(obs['pixels'], (1,2,0)))
+        plt.savefig(f'{work_dir}/outs/{module_name}/env_reset.jpg')
+
 
     def save_timestep(self, state_id): 
         # Get the action from the data
@@ -51,15 +55,17 @@ class TrajectoryReplay:
 
     def save_trajectory(self, title='cube_flipping_trajectory_endeff.mp4'):
         obs = self.env.reset()
-        print('obs.shape: {}'.format(obs["pixels"].shape))
-        print('obs.features after resetting: {}'.format(obs["features"]))
         self.video_recorder.init(obs = obs['pixels'])
 
+        pbar = tqdm(total=len(self.data['hand_actions']['indices']))
+
         for state_id in range(len(self.data['hand_actions']['indices'])):
-            print(f'State ID: {state_id}')
             self.save_timestep(state_id)
+            pbar.update(1)
+            pbar.set_description(f'State ID: {state_id}')
 
         self.video_recorder.save(title)
+        pbar.close()
 
 
 @hydra.main(version_base=None, config_path='../../configs', config_name='testing')
