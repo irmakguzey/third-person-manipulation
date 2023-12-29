@@ -15,12 +15,17 @@ class VideoRecorder:
 
     def init(self, obs):
         self.frames = []
-        self.record(obs)
+        # self.record(obs)
+        self.record_realsense(obs)
 
     def record(self, obs):
         frame = cv2.resize(obs[-3:].transpose(1, 2, 0),
                             dsize=(self.render_size, self.render_size),
                             interpolation=cv2.INTER_CUBIC)
+        self.frames.append(frame)
+
+    def record_realsense(self, img):
+        frame = img
         self.frames.append(frame)
 
     def save(self, file_name):

@@ -13,3 +13,17 @@ fingertip_replay:
   env_cfg: 
     _target_: dexterous_env.fingertip_motion_env.FingertipMotionEnv
   
+
+base_calibr:
+  camera_intrinsics: [[910.45477295,   0.,         648.40692139],
+                      [  0.,         910.58001709, 379.32769775],
+                      [  0.,          0.,           1.        ]]
+  distortion_coefficients: [0., 0., 0., 0., 0.]
+  end_effector_position: [[0,0.02,-0.01]]                      # End effector position with respect to the marker frame
+  end_effector_realignment_matrix: [[0,1,0],[0,0,-1],[-1,0,0]] # Default end effector orientation with respect to base frame
+  translation_ratio: 0.2                                      # translation in camera frame / translation in robot fr
+  host: '172.24.71.220'
+  port: 10005
+  save_dir: /media/data/third_person_man/base_frame/10
+  calibr_duration: 15
+  test_duration: 30
