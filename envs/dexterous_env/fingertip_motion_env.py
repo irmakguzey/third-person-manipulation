@@ -76,7 +76,7 @@ class FingertipMotionEnv(DexterousSimulationEnv):
         print('  Created camera sensor')
         
         # Actually set the camera position
-        camera_position = gymapi.Vec3(1.2, 1.8, 0.0)
+        camera_position = gymapi.Vec3(0.18, 2.3, 0.0)
         camera_target = gymapi.Vec3(0.2, 1.5, 0.0)
         self.gym.set_camera_location(self.camera_handle, self.env, camera_position, camera_target)
         print('  Set camera location')
@@ -217,6 +217,51 @@ class FingertipMotionEnv(DexterousSimulationEnv):
 
         fingertip_poses_wrt_world = np.stack(fingertip_poses_wrt_world, axis=0)
         return fingertip_poses_wrt_world
+    
+    def get_action_fingertip_poses(self, features, endeff_pose='home_pose', return_projected_poses=False): 
+        # Get the endeffector matrix
+        if endeff_pose == 'home_pose': 
+            H_E_O = self._get_home_endeff_pose(
+                relative_to_camera = False
+            )
+            if return_projected_poses:
+                H_E_C = self._get_home_endeff_pose(
+                    relative_to_camera = True
+                )
+        elif endeff_pose == 'current_pose':
+            H_E_O = self._get_current_endeff_pose(
+                relative_to_camera = False
+            )
+            if return_projected_poses:
+                H_E_C = self._get_current_endeff_pose(
+                    relative_to_camera = True
+                )
+
+        fingertip_poses = self.calculate_fingertip_positions(features = features)
+        fingertip_poses_wrt_world = []
+        if return_projected_poses:
+            projected_fingertip_poses = []
+        for H_F_E in fingertip_poses: # Homo to take fingertip pose frame to the end effector frame
+            H_F_O = H_E_O @ H_F_E  # Homo to take fingertip pose frame to the origin 
+            fingertip_poses_wrt_world.append(H_F_O)
+
+            if return_projected_poses:
+                # Project the fingertip position
+                H_F_C = H_E_C @ H_F_E 
+                rvec, tvec = H_F_C[:3, :3], H_F_C[:3, 3]
+
+                # Translate these fingertip points to image
+                fingertip_2d = self.project_axes(rvec, tvec, self.intrinsic_matrix)
+                projected_fingertip_poses.append(fingertip_2d)
+
+        fingertip_poses_wrt_world = np.stack(fingertip_poses_wrt_world, axis=0)
+
+        if return_projected_poses:
+            projected_fingertip_poses = np.stack(projected_fingertip_poses, axis=0)
+            return fingertip_poses_wrt_world, projected_fingertip_poses
+
+        return fingertip_poses_wrt_world
+        
 
     def get_projected_fingertip_positions(self, features, endeff_pose='home_pose'):
 
@@ -224,9 +269,14 @@ class FingertipMotionEnv(DexterousSimulationEnv):
         fingertips_3d = self.calculate_fingertip_positions(features)
 
         # Calculate the camera pose wrt the camera
-        H_E_C = self._get_current_endeff_pose(
-            relative_to_camera = True
-        )        
+        if endeff_pose == 'home_pose':
+            H_E_C = self._get_home_endeff_pose(
+                relative_to_camera = True
+            )
+        elif endeff_pose == 'current_pose':
+            H_E_C = self._get_current_endeff_pose(
+                relative_to_camera = True
+            )        
 
         fingertips_2d = []
         # Get the distance of the fingertips to the camera 

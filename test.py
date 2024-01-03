@@ -29,19 +29,19 @@ def fingertip_ik_replay_ikpy(cfg):
         env_cfg = cfg.env_cfg
     )
 
-    fingertip_replay.save_trajectory(title='fingertip_ik_replay_arm_hand_no_orientation.mp4')
+    fingertip_replay.save_trajectory(title='fingertip_ik_replay.mp4')
 
 
 @hydra.main(version_base=None, config_path='configs', config_name='testing')
 def main(cfg) -> None: 
-    cfg = cfg.fingertip_replay
-    fingertip_replay(cfg)
+    # cfg = cfg.fingertip_replay
+    # fingertip_replay(cfg)
 
     # cfg = cfg.trajectory_replay
     # trajectory_replay(cfg)
 
-    # cfg = cfg.fingertip_ik_replay
-    # fingertip_ik_replay_ikpy(cfg)
+    cfg = cfg.fingertip_ik_replay
+    fingertip_ik_replay_ikpy(cfg)
 
 
 if __name__ == '__main__': 

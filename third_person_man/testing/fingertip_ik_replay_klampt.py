@@ -46,20 +46,15 @@ class FingertipIKReplay(FingertipReplay):
         # Set the initial positions
         obs = self.env.reset()
 
-        # self.solver.set_positions(
-        #     joint_positions = obs['features'][:-7],
-        #     endeff_position = obs['features'][-7:] 
-        # ) 
-
         self.solver.set_positions(
             joint_positions = obs['features'][:-7],
-            endeff_position = np.zeros(7) # For now we are going to ignore the endeffector position 
+            endeff_position = obs['features'][-7:] 
         ) 
 
-        # # Print the obs and robot config positions
-        # print('Obs Features: {}, Robot Config Features: {}'.format(
-        #     obs['features'], self.solver.get_positions()
-        # ))
+        # Print the obs and robot config positions
+        print('Obs Features: {}, Robot Config Features: {}'.format(
+            obs['features'], self.solver.get_positions()
+        ))
 
     def save_timestep(self, state_id):
         # Get the action from the data
@@ -72,14 +67,9 @@ class FingertipIKReplay(FingertipReplay):
             features = demo_action,
             endeff_pose = 'home_pose',
             return_projected_poses = True)
-        
-        action_fingertip_poses = self.env.calculate_fingertip_positions(features = demo_action) # NOTE: This is only for testing
 
         # Find the necessary actions through the IK solver
-        hand_action, endeff_action, errors = self.solver.move_to_pose(poses = action_fingertip_poses)
-        # print('hand_action.shape: {}, endeff_action.shape: {}'.format(
-            # hand_action.shape, endeff_action
-        # ))
+        hand_action, endeff_action = self.solver.move_to_pose(poses = action_fingertip_poses)
 
         # Apply these actions to the environment
         # action = np.concatenate([hand_action, endeff_action], axis=0)
@@ -87,10 +77,7 @@ class FingertipIKReplay(FingertipReplay):
         obs, _, _, _ = self.env.step(action)
         self.record_fingertip_poses(
             obs = obs,
-            desired_fingertip_poses = projected_fingertip_poses,
-            errors = errors,
-            state_id = state_id # For debugging purposes
-        )
+            desired_fingertip_poses = projected_fingertip_poses)
 
         # Apply the final positions from the environment
         # on the IK solver as well
@@ -99,7 +86,7 @@ class FingertipIKReplay(FingertipReplay):
             endeff_position = obs['features'][-7:] 
         ) 
 
-    def record_fingertip_poses(self, obs, desired_fingertip_poses=None, errors=None, state_id=None): # TODO: Delete this and use one from the other replay module
+    def record_fingertip_poses(self, obs, desired_fingertip_poses=None): # TODO: Delete this and use one from the other replay module
         # Get the transformed fingertip positions
         fingertips_2d = self.env.get_projected_fingertip_positions(
             obs['features'],
@@ -128,51 +115,6 @@ class FingertipIKReplay(FingertipReplay):
             obs = np.transpose(img, (2,0,1))
         )
 
-        # Plot the errors and concatenate to the video
-        error_plt_dir = '/home/irmak/Workspace/third-person-manipulation/third_person_man/testing/outs/fingertip_ik_replay/error_plots'
-
-        fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(10,10))
-        for finger_id in range(len(errors)):
-            axs[finger_id, 0].set_ylabel(f'Finger ID: {finger_id}')
-            for axis_id in range(errors[finger_id].shape[1]):
-                # axs[finger_id, axis_id].set_ylim(
-                #     bottom = -0.05,
-                #     top = 0.05
-                # )
-
-                # print('len(error[finger_id][:, axis_id]): {}'.format(
-                #     len(errors[finger_id][:, axis_id]) 
-                # ))
-                if len(errors[finger_id][:, axis_id]) == 1: # It immediately got out
-                    print('errors with 1 len: {}'.format(
-                        errors[finger_id][:, axis_id]
-                    ))
-                    axs[finger_id, axis_id].plot(range(5), np.zeros(5))
-                else: 
-                    axs[finger_id, axis_id].plot(errors[finger_id][:, axis_id])
-                if finger_id == 0:
-                    axs[finger_id, axis_id].set_title('Axis: {}'.format(axis_id))
-        
-        plt.savefig(f'{error_plt_dir}/errors_plot.png',
-                    bbox_inches='tight')
-        fig.clf()
-        plt.close()
-
-        # Dump the image as well
-        plt.axis('off')
-        plt.imsave(f'{error_plt_dir}/errors_hand.png', img)
-
-        # Read and concat the images
-        from third_person_man.utils import concat_imgs
-        recorded_img = concat_imgs(
-            img1 = cv2.imread(f'{error_plt_dir}/errors_hand.png'), 
-            img2 = cv2.imread(f'{error_plt_dir}/errors_plot.png'),
-            orientation = 'horizontal'
-        )
-
-        cv2.imwrite(f'{error_plt_dir}/visualization/state_{str(state_id).zfill(2)}.png', recorded_img)
-        
-
     def save_trajectory(self, title='fingertip_ik_replay.mp4'):
         obs = self.env.reset()
         self.video_recorder.init(obs = obs['pixels'])
@@ -187,12 +129,5 @@ class FingertipIKReplay(FingertipReplay):
             # if state_id > 5: 
             #     break
 
-        pbar.close()
         self.video_recorder.save(title)
-
-        from third_person_man.utils import turn_images_to_video
-        turn_images_to_video(
-            viz_dir = '/home/irmak/Workspace/third-person-manipulation/third_person_man/testing/outs/fingertip_ik_replay/error_plots/visualization',
-            video_fps = 10,
-            video_name = 'error_visualization.mp4'
-        )
+        pbar.close()

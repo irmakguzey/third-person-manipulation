@@ -67,10 +67,6 @@ class FingertipReplay(TrajectoryReplay):
             obs['features'],
             endeff_pose = 'current_pose'
         )
-        
-        # work_dir = os.path.dirname(__file__)
-        # plt.imshow(np.transpose(obs['pixels'], (1,2,0)))
-        # plt.savefig(f'{work_dir}/outs/fingertip_replay/pre_fingertips_obs.jpg')
 
         # Plot the fingertips on top of the image
         # img = np.transpose(np.float32(obs['pixels']) / 255., (1,2,0))
@@ -79,10 +75,6 @@ class FingertipReplay(TrajectoryReplay):
             np.transpose(obs['pixels'], (1,2,0))
         )
         img = self.plot_axes(axes=fingertips_2d, img=img)
-
-        # work_dir = os.path.dirname(__file__)
-        # plt.imshow(img)
-        # plt.savefig(f'{work_dir}/outs/fingertip_replay/post_fingertips_obs.jpg')
 
         # Plot the end effector position
         eef_2d = self.env.get_projected_endeffector_position(
