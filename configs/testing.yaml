@@ -20,4 +20,16 @@ fingertip_ik_replay:
   module_name: fingertip_ik_replay
   env_cfg: 
     _target_: dexterous_env.fingertip_motion_env.FingertipMotionEnv
-  
+  desired_finger_types: ['thumb'] 
+  trajectory_title: fingertip_ik_replay_multi_step_thumb
+
+fingertip_ik_tester:
+  data_path: /data/third_person_manipulation/sim_cube_flipping
+  demo_num: 1
+  representations: ['image', 'allegro']
+  module_name: fingertip_ik_tester
+  num_of_examples: 10
+  env_cfg: 
+    _target_: dexterous_env.fingertip_motion_env.FingertipMotionEnv
+  desired_finger_types: ['thumb'] 
+  plot_name: thumb_fingertip_test

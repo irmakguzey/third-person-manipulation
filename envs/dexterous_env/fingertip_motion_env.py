@@ -38,7 +38,7 @@ class FingertipMotionEnv(DexterousSimulationEnv):
         table_asset_file = "allegro_hand_description/urdf/table.urdf"
 
         asset_options = gymapi.AssetOptions()
-        asset_options.fix_base_link = False
+        asset_options.fix_base_link = True
         asset_options.flip_visual_attachments =  False 
         asset_options.use_mesh_materials = True
         asset_options.disable_gravity = True
@@ -76,8 +76,10 @@ class FingertipMotionEnv(DexterousSimulationEnv):
         print('  Created camera sensor')
         
         # Actually set the camera position
-        camera_position = gymapi.Vec3(0.18, 2.3, 0.0)
-        camera_target = gymapi.Vec3(0.2, 1.5, 0.0)
+        # camera_position = gymapi.Vec3(0.18, 2.3, 0.0)
+        # camera_target = gymapi.Vec3(0.2, 1.5, 0.0)
+        camera_position = gymapi.Vec3(0.1, 1.8, -0.04)
+        camera_target = gymapi.Vec3(0.1, 1.7, -0.04)
         self.gym.set_camera_location(self.camera_handle, self.env, camera_position, camera_target)
         print('  Set camera location')
         self.gym.start_access_image_tensors(self.sim)   

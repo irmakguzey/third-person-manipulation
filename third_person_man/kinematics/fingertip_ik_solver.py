@@ -59,38 +59,11 @@ class FingertipChain:
     def get_position_jacobian(self): # 3 dimenisional jacobian 
         # tip_jacobian: 3xn (n: number of DOFs) position jacobian matrix
         return self.tip_link.getPositionJacobian([0,0,0])
-        # desired: a positional vector
-        # solver = IKSolver(self.robot)
-        # objective = ik.objective(
-        #     body = self.tip_link,
-        #     local = [0,0,0],
-        #     world = desired
-        # )
-        # solver.add(objective)
-
-        # # Get the active dofs
-        # print('solver.activeDofs: {}, solver.getJacobian(): {}'.format(
-        #     solver.getActiveDofs(), solver.getJacobian()
-        # ))
-
-        all_jacobian = self.tip_link.getPositionJacobian([0,0,0])
-
-        # print('all')
-
-        joint_indices = self.get_joint_indices()
-
-        joint_jacobians = []
-        for joint_id in joint_indices: 
-            joint_jacobians.append(all_jacobian[:,joint_id])
-
-        # print('joint_jacobians: {}'.format(np.asarray(joint_jacobians)))
-        return np.asarray(joint_jacobians).T
 
     def get_orientation_jacobian(self): # 3 dimensional jacobian
         # tip_jacobian: 3xn (n: number of DOFs) orientation jacobian matrix
         return self.tip_link.getOrientationJacobian()
     
-
     # Returns error in position vectors and axis angles
     def get_current_error(self, desired, error_type='position'):
         if error_type == 'position':
@@ -213,17 +186,9 @@ class FingertipChain:
         # Get the current error
         x_e = self.get_current_error(desired=desired, error_type=compute_type)
 
-        # Get the current jacobian 
+        # Get the current jacobian and the necessary change
         current_jacobian = self.get_jacobian(compute_type=compute_type)
-        # print('current_jacobian.shape: {}, x_e.shape: {}'.format(
-        #     current_jacobian.shape, x_e.shape))
-
         all_joints_pos_change = np.linalg.pinv(current_jacobian) @ x_e
-
-        # print('all_joints_pos_change: {}'.format(all_joints_pos_change)) # NOTE: Right now the main problem is that the change in the wrist are huge
-        # print('joint_pos_change.shape: {}'.format(all_joints_pos_change.shape))
-
-        # return all_joints_pos_change
 
         # Return the change in our current joint
         joint_indices = self.get_joint_indices()
@@ -232,8 +197,7 @@ class FingertipChain:
             joint_pos_change.append(all_joints_pos_change[joint_id])
 
         return np.asarray(joint_pos_change)
-    
-    
+
     
     def inverse_kinematics(self, desired, threshold=1e-3, max_iterations=1000, compute_type='position', pbar=None): 
         # Will return the relative change and the calculated joint angles
@@ -243,7 +207,8 @@ class FingertipChain:
         
         errors = []
 
-        learning_rate = 1
+        learning_rate = 0.1 # NOTE: Might change this afterwards
+        iteration_joint_positions = [] # This is for debugging
         
         for i in range(max_iterations): 
             # Calculate the 
@@ -255,53 +220,46 @@ class FingertipChain:
             # Add the current position change in the joints
             curr_joint_positions += learning_rate * curr_joint_pos_change
             delta_joint_positions += learning_rate * curr_joint_pos_change
+            iteration_joint_positions.append(curr_joint_positions)
 
             # Set the joint positions to have the forward kinematics and the jacobian
             self.set_joint_positions(curr_joint_positions)
 
             # Calculate the error to break if it's found
             curr_error = self.get_current_error(desired = desired, error_type = compute_type)
-
-            if np.isclose(curr_joint_pos_change, np.zeros(4)).any():
-                print('curr_joint_pos_change: {}, error: {}'.format(
-                    curr_joint_pos_change, curr_error
-                ))
-
             errors.append(curr_error)
 
             if not pbar is None: # Means debugs
                 pbar.update(1)
                 pbar.set_description('Iteration: {}, Error: {}'.format(i, curr_error))
 
-            # print('(curr_error < threshold): {}'.format(
-            #     (curr_error < threshold)))
             if (np.abs(curr_error) < threshold).all():
                 break
 
-            # if learning_rate > 0.5:
-            # learning_rate *= 1.01
-
         errors = np.asarray(errors)
+        iteration_joint_positions = np.stack(iteration_joint_positions, axis=0) # Shape: (1000, 4)
         # if len(errors) == 1: 
         #     print('errors: {}'.format(errors))
-        return curr_joint_positions, delta_joint_positions, pbar, errors
+        return curr_joint_positions, delta_joint_positions, pbar, errors, iteration_joint_positions
 
 class FingertipIKSolver:
-    def __init__(self, urdf_path):
+    def __init__(self, urdf_path, desired_finger_types):
         # Initialize the world and the robot
         self.world = WorldModel()
-        # robot_id = self.world.loadRobot(fn = urdf_path)
-        # self.robot = self.world.robot(robot_id)
         self.robot = self.world.loadRobot(
             fn = urdf_path
         )
 
-        self.fingertip_link_mappings = dict(
+        urdf_fingertip_mappings = dict(
             index = 'link_3.0_tip',
             middle = 'link_15.0_tip',
             ring = 'link_7.0_tip',
             thumb = 'link_11.0_tip'
         )
+
+        self.fingertip_link_mappings = {} 
+        for finger_type in desired_finger_types:
+            self.fingertip_link_mappings[finger_type] = urdf_fingertip_mappings[finger_type]
 
         # Create the chains
         self.chains = {}
@@ -313,52 +271,52 @@ class FingertipIKSolver:
                 # base_position = np.zeros(7) 
             )
 
-    def move_to_pose(self, poses): 
+    def move_to_pose(self, poses, demo_action=None): 
         from third_person_man.utils import turn_homo_to_frames
-        # poses: 4 fingertip poses as homogenous matrices: (4, 4, 4,)
+        # poses: 4 fingertip poses as homogenous matrices: (4, 4, 4,) - poses will always come with all the fingers on it
         # assumption is that indexing: 0: index, 1: middle, 2: ring, 3: thumb
+        # if demo_hand_action is not None it means that we will only apply IK on
+        # some of the fingers
 
+        # Here are the instructions for the method
         # Traverse through the poses
         # For each pose find the required angles to apply using inverse kinematics
         # Get the joint angles and return them stacked - should only use the hand for now
 
         joint_positions = []
-        # pbar = tqdm(total = 1000)
-        # _, axs = plt.subplots(nrows=4, ncols=3, figsize=(15,5))
-        # for i in range(errors.shape[1]): 
-        #     axs[i].plot(errors[:,i])
-        #     axs[i].set_label(f'Axis: {i}')
-        # plt.savefig('/home/irmak/Workspace/third-person-manipulation/third_person_man/testing/outs/errors_plot.png''/home/irmak/Workspace/third-person-manipulation/third_person_man/testing/outs/errors_plot.png')
-        
-
+        iteration_joint_positions = []
         errors = []
         for i, finger_type in enumerate(['index', 'middle', 'ring', 'thumb']):
             desired_pose = poses[i] # For now this is wrt the world, so we should set the base position
 
             # NOTE: For now we are only testing position
-            _, desired_tvec = turn_homo_to_frames(matrix = desired_pose)
-            finger_joint_positions, _, pbar_holder, finger_errors = self.chains[finger_type].inverse_kinematics(
-                desired = desired_tvec,
-                compute_type = 'position',
-                threshold = 1e-3,
-                # pbar = pbar if finger_type == 'middle' else None
-            )
-            # if finger_type == 'middle': pbar = pbar_holder
-            
-            # print('finger_joint_positions.shape: {}'.format(finger_joint_positions.shape))
+            if finger_type in self.fingertip_link_mappings.keys(): # Will check the keys
+                _, desired_tvec = turn_homo_to_frames(matrix = desired_pose)
+                finger_joint_positions, _, _, finger_errors, finger_iteration_joint_positions = self.chains[finger_type].inverse_kinematics(
+                    desired = desired_tvec,
+                    compute_type = 'position',
+                    threshold = 1e-3,
+                )
+            else: # Just get it from the demo_hand_action
+                finger_joint_positions = np.zeros(4)
+                finger_iteration_joint_positions = np.zeros((1000, 4))
+                finger_errors = np.zeros((1000, 3))
+
             joint_positions.append(finger_joint_positions)
+            iteration_joint_positions.append(finger_iteration_joint_positions) # (4, 1000, 4)
             errors.append(finger_errors)
 
         joint_positions = np.concatenate(joint_positions, axis=0)
-        # pbar.close()
-        # print('joint_positions.shape: {}'.format(joint_positions.shape))
+        iteration_joint_positions = np.concatenate(iteration_joint_positions, axis=1) # Concatenate in the finger positions
+        errors = np.stack(errors, axis=0)
+
         endeff_position = [0.2, 1.5, 0.0, 0, 0, 0.7071068, 0.7071068 ]
-        return joint_positions, endeff_position, errors
+        return joint_positions, endeff_position, errors, iteration_joint_positions
     
-    def set_positions(self, joint_positions, endeff_position):
+    def set_positions(self, joint_positions, endeff_position): # This is removed from the eq for now
 
         # Set these for each of the chains separately
-        for i, finger_type in enumerate(['index', 'middle', 'ring', 'thumb']): 
+        for i, finger_type in enumerate(self.chains.keys()): 
             finger_joint_pos = joint_positions[4*i:4*(i+1)]
             self.chains[finger_type].set_joint_positions(joint_positions=finger_joint_pos)
             # self.chains[finger_type].set_base_position(base_position = endeff_position)
