@@ -10,7 +10,8 @@ def baseframe_replay(cfg):
         cfg = cfg
     )
     baseframe_replay.save_baseframe_trajectory()
-    baseframe_replay.save_end_effector_trajectory()
+    # baseframe_replay.save_end_effector_trajectory()
+    baseframe_replay.save_fingertip_trajectory()
 
 
 @hydra.main(version_base=None, config_path='configs', config_name='testing')

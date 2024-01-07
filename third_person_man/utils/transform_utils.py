@@ -1,8 +1,21 @@
 import math
 import numpy as np
 
-# Taken from https://github.com/UT-Austin-RPL/deoxys_control
+def turn_homo_to_frames(matrix):
+    # matrix: 4x4 homogenous matrix
+    rvec = matrix[:3, :3]
+    tvec = matrix[:3, 3]
+    
+    return rvec, tvec 
 
+def turn_frames_to_homo(rvec, tvec): 
+    homo_mat = np.zeros((4,4))
+    homo_mat[:3, :3] = rvec
+    homo_mat[:3, 3] = tvec
+    homo_mat[3, 3] = 1
+    return homo_mat
+
+# Taken from https://github.com/UT-Austin-RPL/deoxys_control
 def quat_multiply(quaternion1, quaternion0):
     """
     Return multiplication of two quaternions (q1 * q0).

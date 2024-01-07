@@ -31,7 +31,7 @@ class CubeFlippingEnv(DexterousSimulationEnv):
 
     def load_urdfs(self): 
         print('** Loading URDFs **')
-        actor_asset_file = "allegro_hand_description/urdf/model_new_final.urdf"
+        actor_asset_file = "allegro_hand_description/urdf/model_only_hand.urdf"
         table_asset_file = "allegro_hand_description/urdf/table.urdf"
         cube_asset_file = "allegro_hand_description/urdf/cube_multicolor.urdf"
 

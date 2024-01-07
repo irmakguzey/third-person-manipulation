@@ -14,7 +14,6 @@ import os
 os.environ['MESA_VK_DEVICE_SELECT'] = '10de:24b0'
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
-
 class DexterousSimulationEnv: 
     def __init__(self, **kwargs):
 
@@ -130,7 +129,18 @@ class DexterousSimulationEnv:
     def set_hand_position(self, position): # position: (1,16)
         if len(position.shape) == 1:
             position = np.reshape(position, (1,-1)) # Add another dimension if not existing
-        self.gym.set_dof_position_target_tensor(self.sim,  gymtorch.unwrap_tensor(position))
+        # self.gym.set_dof_position_target_tensor(self.sim,  gymtorch.unwrap_tensor(position)) 
+            
+        # NOTE: This is for having a motion without any PD control on the hand
+        actor_indices = to_torch([self.actor_idx], dtype=torch.int32, device='cpu') 
+        state_vector = torch.zeros((16,2))
+        state_vector[:,0] = position[0,:]
+        self.gym.set_dof_state_tensor_indexed( # NOTE: This is for without having any positional control
+            self.sim,
+            gymtorch.unwrap_tensor(state_vector),
+            gymtorch.unwrap_tensor(actor_indices),
+            len(actor_indices)
+        )
 
     # Set Hand velocity
     def set_hand_velocity(self, velocity):

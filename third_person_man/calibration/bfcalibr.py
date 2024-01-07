@@ -19,6 +19,8 @@ from scipy.spatial.transform import Rotation
 from pathlib import Path
 from tqdm import tqdm
 from holobot.robot.kinova import KinovaArm
+from holobot.robot.allegro.allegro import AllegroHand
+from holobot.robot.allegro.allegro_kdl import AllegroKDL
 from third_person_man.utils import VideoRecorder
 
 
@@ -32,24 +34,27 @@ class BaseframeReplay():
         self.end_effector_position = np.array(cfg.end_effector_position)
         self.end_effector_realignment_matrix = np.array(cfg.end_effector_realignment_matrix)
         self.translation_ratio = cfg.translation_ratio
+        self.eef_to_hand = cfg.eef_to_hand
         self.ratio_list = []
 
         self.save_dir = cfg.save_dir
         self.host = cfg.host
         self.port = cfg.port
-        self.arm = KinovaArm()
         self.calibr_duration = cfg.calibr_duration
         self.test_duration = cfg.test_duration
+
+        self.base_rvec = np.array(cfg.rvec_calibr)
+        self.base_tvec = np.array(cfg.tvec_calibr) 
+
+        self.arm = KinovaArm()
+        self.hand = AllegroHand()
+        self.hand_solver = AllegroKDL()
 
         self.video_recorder = VideoRecorder(
             save_dir = Path(self.save_dir),
             fps = 20
         )
         time.sleep(1)
-
-        self.base_rvec = None
-        self.base_tvec = None
-
 
     def _get_curr_image(self):
         image_subscriber = ZMQCameraSubscriber( # TODO: Change this such that it will create a subscriber only once
@@ -130,7 +135,6 @@ class BaseframeReplay():
         rotation_end_to_camera = np.vstack((rotation_end_to_camera, np.array([0, 0, 0, 1])))
 
         rotation_matrix_base_to_camera = np.dot(rotation_end_to_camera, rotation_base_to_end)
-
         base_rvec = Rotation.from_matrix(rotation_matrix_base_to_camera[:3,:3]).as_rotvec()
         base_tvec = rotation_matrix_base_to_camera[:3,3]
         return base_rvec, base_tvec
@@ -147,7 +151,6 @@ class BaseframeReplay():
         rotation_base_to_camera = np.vstack((rotation_base_to_camera, np.array([0, 0, 0, 1])))
 
         rotation_matrix_eef_to_camera = np.dot(rotation_base_to_camera, rotation_end_to_base)
-
         eef_rvec = Rotation.from_matrix(rotation_matrix_eef_to_camera[:3,:3]).as_rotvec()
         eef_tvec = rotation_matrix_eef_to_camera[:3,3]
         return eef_rvec, eef_tvec
@@ -170,6 +173,54 @@ class BaseframeReplay():
         eef_tvec = rotation_matrix_eef_to_base[:3,3].reshape(1,3) / self.translation_ratio
         pose = np.concatenate((eef_tvec, eef_quat),axis=1)
         return pose
+    
+
+    def hand_position(self, end_rvec, end_tvec): # The orientation of hand (end effector) with respect to the camera
+        
+        # transform from the end effector ro the camera
+        rotation_end_to_camera, _ = cv2.Rodrigues(end_rvec)
+        rotation_end_to_camera = np.hstack((rotation_end_to_camera, end_tvec.reshape(3,1)))
+        rotation_end_to_camera = np.vstack((rotation_end_to_camera, np.array([0, 0, 0, 1])))
+
+        rotation_matrix_hand_to_camera = np.dot(rotation_end_to_camera, self.eef_to_hand)
+        hand_rvec = Rotation.from_matrix(rotation_matrix_hand_to_camera[:3,:3]).as_rotvec()
+        hand_tvec = rotation_matrix_hand_to_camera[:3,3]
+        return hand_rvec, hand_tvec
+
+    def finger_tips(self, hand_rvec, hand_tvec): # The orientation of fingertips with respect to the camera
+        # Get fingertip orientation with respect to hand
+        # transform from the hand to the camera
+        rotation_hand_to_camera, _ = cv2.Rodrigues(hand_rvec)
+        rotation_hand_to_camera = np.hstack((rotation_hand_to_camera, hand_tvec.reshape(3,1)))
+        rotation_hand_to_camera = np.vstack((rotation_hand_to_camera, np.array([0, 0, 0, 1])))
+        # Get hand positions
+        features = self.hand.get_joint_position()
+
+        fingertip_poses = []
+        for i, finger_type in enumerate(['index', 'middle', 'ring', 'thumb']):
+            finger_tvec, finger_rvec = self.hand_solver.finger_forward_kinematics(
+                finger_type, features[i*4:(i+1)*4]
+            )
+            finger_tvec = finger_tvec * self.translation_ratio
+            # Stack tvec and rvec
+            fingertip_pose = np.hstack((finger_rvec, finger_tvec.reshape(3,1)))
+            fingertip_pose = np.vstack((fingertip_pose, np.array([0, 0, 0, 1])))
+            fingertip_poses.append(fingertip_pose)
+
+        fingertip_poses = np.stack(fingertip_poses, axis=0)
+
+        fingertip_poses_to_camera = []
+        for H_F_E in fingertip_poses: # Homo to take fingertip pose frame to the end effector frame
+            H_F_O = rotation_hand_to_camera @ H_F_E     # Homo to take fingertip pose frame to the origin 
+            #convert this to rvec and tvec
+            finger_rvec = Rotation.from_matrix(H_F_O[:3,:3]).as_rotvec()
+            finger_tvec = H_F_O[:3,3]
+            fingertip_poses_to_camera.append([finger_rvec,finger_tvec])
+
+        return fingertip_poses_to_camera
+
+
+
 
 
     def get_base_frame(self, first_frame, save_individual_frame): # returns the plotted image of current frame
@@ -249,8 +300,10 @@ class BaseframeReplay():
     
         self.base_rvec = np.mean(np.stack(base_rvec_list, axis=0), axis=0)
         self.base_tvec = np.mean(np.stack(base_tvec_list, axis=0), axis=0)
-        print('Calibrated base_rvec: {}'.format(self.base_rvec))
-        print('Calibrated base_tvec: {}'.format(self.base_tvec))
+        base_rvec = np.array2string(self.base_rvec, precision=5, separator=', ', suppress_small=True)
+        base_tvec = np.array2string(self.base_tvec, precision=5, separator=', ', suppress_small=True)
+        print('Calibrated base_rvec: {}'.format(base_rvec))
+        print('Calibrated base_tvec: {}'.format(base_tvec))
 
         self.video_recorder.save('base_frame_trajectory.mp4')
             
@@ -323,5 +376,47 @@ class BaseframeReplay():
             self.video_recorder.record_realsense(img)
 
         self.video_recorder.save('end_effector_trajectory.mp4')
+
+    
+    def test_fingertip_calibr(self):
+        if self.base_rvec is None or self.base_tvec is None:
+            print('ERROR!!!Please Calibrate First!!!')
+            return 
+        
+        ## NOTE: Plot the gt end_effector and calibrated base frame
+        image = self._get_curr_image()
+        markers, frame_axis = self.get_markers(image, False)
+        frame_axis = cv2.drawFrameAxes(frame_axis.copy(), self.camera_intrinsics, self.distortion_coefficients, self.base_rvec, self.base_tvec, 0.01)
+        
+        #get the current status of the KinovaArm
+        pose = self.arm.get_cartesian_position()
+        end_effector_in_base_frame = np.array(pose[0:3])  * self.translation_ratio
+        end_effector_rotation_in_base_frame = np.array(pose[3:])
+        
+        # This is the predicted end effector position
+        eef_rvec, eef_tvec = self.end_effector(self.base_rvec, self.base_tvec, end_effector_in_base_frame, end_effector_rotation_in_base_frame)
+        frame_axis = cv2.drawFrameAxes(frame_axis.copy(), self.camera_intrinsics, self.distortion_coefficients, eef_rvec, eef_tvec, 0.01)
+        # Get hand orietation
+        hand_rvec, hand_tvec = self.hand_position(eef_rvec, eef_tvec)
+        # Get the predicted fingertip orientation
+        fingertip_poses = self.finger_tips(hand_rvec, hand_tvec)
+        print(fingertip_poses)
+        for finger in fingertip_poses: 
+            frame_axis = cv2.drawFrameAxes(frame_axis.copy(), self.camera_intrinsics, self.distortion_coefficients, finger[0], finger[1], 0.01)
+            
+        return frame_axis
+
+    def save_fingertip_trajectory(self):
+        start_time = time.time()
+        time_step = 0
+        while time.time() - start_time < self.test_duration:
+            img  = self.test_fingertip_calibr()
+            print('Getting fingertip positions!')
+            if time_step == 0: 
+                self.video_recorder.init(obs=img)
+            time_step += 1
+            self.video_recorder.record_realsense(img)
+
+        self.video_recorder.save('fingertip_trajectory.mp4')
 
 
