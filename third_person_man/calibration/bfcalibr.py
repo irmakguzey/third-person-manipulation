@@ -19,6 +19,7 @@ from scipy.spatial.transform import Rotation
 
 from pathlib import Path
 from tqdm import tqdm
+from holobot_api.api import DeployAPI 
 from holobot.robot.kinova import KinovaArm
 from holobot.robot.allegro.allegro import AllegroHand
 from holobot.robot.allegro.allegro_kdl import AllegroKDL
@@ -55,7 +56,16 @@ class BaseframeReplay():
         self.hand_solver = AllegroKDL()
         self.solver = FingertipIKSolver(
             urdf_path = get_path_in_package('kinematics/assets/allegro_hand_right.urdf'),
-            desired_finger_types= ['index', 'middle', 'ring', 'thumb']
+            desired_finger_types= ['index']
+        )
+
+        required_data = {
+            'rgb_idxs': [0],
+            'depth_idxs': [0]
+        }
+        self.deploy_api = DeployAPI(
+            host_address = '172.24.71.220',
+            required_data = required_data
         )
 
         self.video_recorder = VideoRecorder(
@@ -457,6 +467,21 @@ class BaseframeReplay():
             pickle.dump(frames, file)
 
 
+    def get_pose(self, four_fingers):
+        # Get the current hand joint positions (to calculate current position)
+        features = self.hand.get_joint_position()
+        self.solver.set_positions(
+            joint_positions = features[:],
+            endeff_position = np.zeros(7) # For now we are going to ignore the endeffector position 
+        ) 
+        hand_action, _, errors, _, _ = self.solver.move_to_pose(
+                    poses = four_fingers,
+                    demo_action = None)
+        
+        return hand_action
+
+
+
     def ik_replay_on_real_robot(self): # This tests the inverse kinematics of current setup
         fingertip_file = self.replay_dir + '/fingertip_poses.pkl'
         with open(fingertip_file, 'rb') as file:
@@ -472,22 +497,23 @@ class BaseframeReplay():
             four_fingers = []
             fingertips = fingertip_poses[frame]
             eef_rvec, eef_tvec = eef_poses[frame]
-            print('\n')
-            print(fingertips)
             # Get hand orientation
             hand_rvec, hand_tvec = self.hand_position(eef_rvec, eef_tvec)
             # Calculate the finger_to_hand_rvec, finger_to_hand_tvec
             for i, finger_type in enumerate(['index', 'middle', 'ring', 'thumb']):
                 finger_to_hand_frame = self.finger_to_hand(fingertips[i][0], fingertips[i][1], hand_rvec, hand_tvec)
                 four_fingers.append(finger_to_hand_frame)
-
+            
             # Pass the pose into inverse kinematics
-            hand_action, _, errors, _, _ = self.solver.move_to_pose(
-                    poses = four_fingers,
-                    demo_action = None)
+            joint_command = {}
+            joint_command['allegro'] = self.get_pose(four_fingers)
+            self.deploy_api.send_robot_action(joint_command)
+
+
+            
             
             desired_finger_position.append(four_fingers)
-            joint_commands.append(hand_action)
+            # joint_commands.append(hand_action)
 
             
             # Perform inverse kinematics, get and record joint commands

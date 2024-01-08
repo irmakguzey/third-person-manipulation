@@ -21,7 +21,7 @@ def fingertip_replay(cfg):
 
     fingertip_replay.save_trajectory(title='fingertip_replay_eef_motion.mp4')
 
-def fingertip_ik_replay_ikpy(cfg):
+def fingertip_ik_replay(cfg):
     fingertip_replay = FingertipIKReplay(
         data_path = cfg.data_path, 
         demo_num = cfg.demo_num, 
@@ -55,12 +55,12 @@ def main(cfg) -> None:
     # cfg = cfg.trajectory_replay
     # trajectory_replay(cfg)
 
-    # cfg = cfg.fingertip_ik_replay
-    # fingertip_ik_replay_ikpy(cfg)
+    cfg = cfg.fingertip_ik_replay
+    fingertip_ik_replay(cfg)
 
-    fingertip_ik_test(
-        cfg = cfg.fingertip_ik_tester
-    )
+    # fingertip_ik_test(
+    #     cfg = cfg.fingertip_ik_tester
+    # )
 
 
 if __name__ == '__main__': 

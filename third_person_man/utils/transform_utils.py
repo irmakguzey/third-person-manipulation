@@ -71,6 +71,7 @@ def quat2axisangle(quat):
     # ))
     # print(f'2.0 * math.acos(quat[3]): {2.0 * math.acos(quat[3])}')
     # print(f'quat[:3] * 2.0 * math.acos(quat[3]): {quat[:3] * 2.0 * math.acos(quat[3])}')
+    
     return (quat[:3] * 2.0 * math.acos(quat[3])) / den
 
 def quat_inverse(quaternion):

@@ -31,7 +31,8 @@ class FingertipIKReplay(FingertipReplay):
                  representations,
                  env_cfg,
                  module_name='fingertip_ik_replay',
-                 desired_finger_types=['index', 'middle', 'ring', 'thumb']): 
+                 desired_finger_types=['index', 'middle', 'ring', 'thumb']
+    ): 
         super().__init__(
             data_path=data_path,
             demo_num=demo_num,
@@ -70,12 +71,11 @@ class FingertipIKReplay(FingertipReplay):
         action_fingertip_poses = self.env.calculate_fingertip_positions(features = demo_action) # NOTE: This is only for testing
 
         # Find the necessary actions through the IK solver
-        hand_action, endeff_action, errors = self.solver.move_to_pose(
+        hand_action, _, errors, _, _ = self.solver.move_to_pose(
             poses = action_fingertip_poses,
             demo_action = demo_action)
 
         # Apply these actions to the environment
-        # action = np.concatenate([hand_action, endeff_action], axis=0)
         action = np.concatenate([hand_action, np.zeros(7)], axis=0) # NOTE: This is for now
         obs, _, _, _ = self.env.step(action)
         self.record_fingertip_poses(
@@ -194,5 +194,5 @@ class FingertipIKReplay(FingertipReplay):
         turn_images_to_video(
             viz_dir = '/home/irmak/Workspace/third-person-manipulation/third_person_man/testing/outs/fingertip_ik_replay/error_plots/visualization',
             video_fps = 10,
-            video_name = 'error_visualization_multi_step_thumb.mp4'
+            video_name = title
         )
