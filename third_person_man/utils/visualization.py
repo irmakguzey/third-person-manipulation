@@ -2,6 +2,28 @@ import cv2
 import os
 import numpy as np 
 
+def plot_axes(axes, img, color_set=1):
+    for axis in axes:
+        axis = axis.astype(int)
+        if color_set == 1:
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[0].ravel()), (255, 0, 0), 3)
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[1].ravel()), (0, 255, 0), 3)
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[2].ravel()), (0, 0, 255), 3)
+    
+        elif color_set == 2:
+
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[0].ravel()), (255, 165, 0), 3) # Orange
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[1].ravel()), (128, 128, 0), 3) # Green
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[2].ravel()), (138, 43, 226), 3) # Purple
+
+        elif color_set == 3: 
+
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[0].ravel()), (255, 153, 153), 3) # Light Red
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[1].ravel()), (204, 255, 204), 3) # Green
+            img = cv2.line(img, tuple(axis[3].ravel()), tuple(axis[2].ravel()), (153, 255, 255), 3) # Light Blue
+
+    return img
+
 def concat_imgs(img1, img2, orientation='horizontal'): # Or it could be vertical as well
     metric_id = 0 if orientation == 'horizontal' else 1
     max_metric = max(img1.shape[metric_id], img2.shape[metric_id])

@@ -135,3 +135,6 @@ wandb/*
 *__pycache__*
 
 *.png
+*.mp4
+
+notebooks/*

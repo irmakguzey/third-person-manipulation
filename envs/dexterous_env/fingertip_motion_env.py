@@ -76,10 +76,12 @@ class FingertipMotionEnv(DexterousSimulationEnv):
         print('  Created camera sensor')
         
         # Actually set the camera position
-        # camera_position = gymapi.Vec3(0.18, 2.3, 0.0)
+        camera_position = gymapi.Vec3(0.18, 2.3, 0.0)
+        camera_target = gymapi.Vec3(0.2, 1.5, 0.0)
+        # camera_position = gymapi.Vec3(0.1, 1.8, -0.04)
+        # camera_target = gymapi.Vec3(0.1, 1.7, -0.04)
+        # camera_position = gymapi.Vec3(0.18, 2.0, 0.0)
         # camera_target = gymapi.Vec3(0.2, 1.5, 0.0)
-        camera_position = gymapi.Vec3(0.1, 1.8, -0.04)
-        camera_target = gymapi.Vec3(0.1, 1.7, -0.04)
         self.gym.set_camera_location(self.camera_handle, self.env, camera_position, camera_target)
         print('  Set camera location')
         self.gym.start_access_image_tensors(self.sim)   
@@ -297,6 +299,31 @@ class FingertipMotionEnv(DexterousSimulationEnv):
 
         fingertips_2d = np.stack(fingertips_2d, axis=0)
         return fingertips_2d
+    
+    def get_projected_poses(self, poses, endeff_pose='home_pose'): # Project the given pose to the camera 
+        # pose: a pose with respect to the end effector
+        # Calculate the camera pose wrt the camera
+        if endeff_pose == 'home_pose':
+            H_E_C = self._get_home_endeff_pose(
+                relative_to_camera = True
+            )
+        elif endeff_pose == 'current_pose':
+            H_E_C = self._get_current_endeff_pose(
+                relative_to_camera = True
+            )   
+
+        projected_camera_poses = []
+        for pose in poses:
+            projected_pose = H_E_C @ pose 
+            rvec, tvec = projected_pose[:3,:3], projected_pose[:3, 3]
+            projected_camera_pose = self.project_axes(rvec, tvec, self.intrinsic_matrix)
+            projected_camera_poses.append(
+                projected_camera_pose
+            )
+
+        projected_camera_poses = np.stack(projected_camera_poses, axis=0)
+        return projected_camera_poses
+
     
     def get_projected_endeffector_position(self, endeff_pose='home_pose'):
 

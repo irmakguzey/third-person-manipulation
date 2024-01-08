@@ -16,7 +16,9 @@ from tqdm import tqdm
 
 from third_person_man.kinematics import FingertipIKSolver
 
-np.set_printoptions(precision=2, suppress=True)
+np.set_printoptions(precision=3, suppress=True)
+
+random.seed(10)
 
 class FingertipIKTester: 
     def __init__(self,
@@ -54,7 +56,8 @@ class FingertipIKTester:
         self.module_name = module_name 
         self.num_of_examples = num_of_examples
         # self.iteration_idxs = [1, 5, 10, 20, 50, 100, 150, 200, 500, 999] # Number of iterations that will be shown
-        self.iteration_idxs = [1, 5, 10, 20, 50, 100, 150]
+        # self.iteration_idxs = [1, 5, 10, 20, 50, 100, 150]
+        self.iteration_idxs = [0,1,2,5,9,10,20,50,99]
         # The last column will plot the error in all of the iterations 
 
         # Create the directory to plot 
@@ -88,7 +91,7 @@ class FingertipIKTester:
 
         return data_points, sample_idx
     
-    def process_data_point(self, data_point):
+    def turn_data_point_to_states(self, data_point):
         # Gets a single data_point (2,16) and returns the next state
         # into a pose and sends the current state as is: 
         # current_state will be applied to the env and the IK solver directly
@@ -102,10 +105,10 @@ class FingertipIKTester:
     # Gets a single datapoint, changes the IK solver accordingly
     # Gets the iteration joint positions
     # Steps and renders each step, returns the images and the total errors for the iterations
-    def process_single_data_point(self, data_point):
+    def process_single_data_point(self, data_point, state_id):
 
         # Get the current state and the desired pose for this data_point
-        current_state, next_pose, next_state = self.process_data_point(data_point)
+        current_state, next_pose, next_state = self.turn_data_point_to_states(data_point)
         
         # print('next_pose: {}'.format(next_pose))
         
@@ -114,35 +117,72 @@ class FingertipIKTester:
             next_state=next_state
         )
 
-        # Step for the first timestep and plot the 
-        first_img = self.plot_single_step(
-            current_state = current_state_used, 
-            next_state = next_state_used
-        )
-        imgs = [first_img]
-
         # Get the iteration joint positions and the error
+        # print('current_state_used: {}'.format(current_state_used))
         self.solver.set_positions(
             joint_positions = current_state_used, 
             endeff_position = None
         )
+
+        # Get the current joint positions from the IK, compare it with the actual
+        # current state
+        print('row id: {}'.format(state_id))
+        thumb_current_state_ik = self.solver.chains['thumb'].get_joint_positions()
+        print('actual current_state: {}, IK current_state: {}'.format(
+            current_state_used[-4:], np.asarray(thumb_current_state_ik)
+        ))
+        
+        # Get the current poses from env and the IK, compare them 
+        from third_person_man.utils import turn_homo_to_frames
+        current_pose = self.env.calculate_fingertip_positions(features = current_state)
+        _, current_tvec = turn_homo_to_frames(matrix = current_pose[-1])
+        
+        # thumb_tvec_ik = self.solver.chains['thumb'].get_current_pose()
+        # print('actual thumb position: {}, IK thumb position: {}'.format(
+        #     current_tvec, np.asarray(thumb_tvec_ik)
+        # ))
+        finger_poses = []
+        for finger_type in ['index', 'middle', 'ring', 'thumb']:
+            if finger_type in self.solver.chains.keys(): 
+                finger_pose = self.solver.chains[finger_type].get_current_pose()
+            else:
+                finger_pose = np.zeros((4,4))
+            finger_poses.append(finger_pose)
+
+        finger_poses = np.stack(finger_poses, axis=0)
+
+        # Step for the first timestep and plot the 
+        first_img = self.plot_single_step(
+            current_state = current_state_used, 
+            next_state = next_state_used,
+            ik_fingertip_poses = finger_poses
+        )
+        imgs = [first_img]
+
+        
         # NOTE: We don't need to get the used poses here because the solver is set to use different 
         # fingers as well
-        final_joint_position, _, errors, iteration_joint_positions = self.solver.move_to_pose(poses = next_pose)
-        # print('iteration_joint_positions.shape: {}'.format(iteration_joint_positions.shape))
+
+
+        final_joint_position, _, errors, iteration_joint_positions, all_ik_fingertip_poses = self.solver.move_to_pose(
+            poses = next_pose,
+            env = self.env # For debugging
+        )
 
         # Iterate in the iteration joint positions and plot them 
         for iteration_id in self.iteration_idxs:
             # Get the joint positions for that iteration
-            if iteration_id > len(iteration_joint_positions):
+            if iteration_id > len(all_ik_fingertip_poses):
                 iteration_id = -1
             iteration_joint_position = iteration_joint_positions[iteration_id]
+            # print(iteration_joint_position.shape)
             iteration_used_state = self.get_used_state(state = iteration_joint_position)
 
             # Step and render the states 
             iteration_img = self.plot_single_step(
                 current_state = iteration_used_state, 
-                next_state = next_state_used
+                next_state = next_state_used,
+                ik_fingertip_poses = all_ik_fingertip_poses[iteration_id]
             )
             # print('iteration_img.shape: {}'.format(iteration_img.shape))
             imgs.append(iteration_img)
@@ -155,13 +195,14 @@ class FingertipIKTester:
         )
         imgs.append(final_img)
 
+        print('----')
         return imgs, errors
 
     # Gets an axs and a row id, single data_point and plots the iterations of the IK solver
     def plot_single_data_point(self, axs, row_id, data_point):
         
         # Process the iterations and get the images / errors for that row
-        row_imgs, row_errors = self.process_single_data_point(data_point = data_point)
+        row_imgs, row_errors = self.process_single_data_point(data_point = data_point, state_id=row_id)
         # print('len(row_imgs): {}, row_errors.shape: {}'.format(
         #     len(row_imgs), row_errors.shape
         # ))
@@ -228,7 +269,7 @@ class FingertipIKTester:
         plt.close() 
 
     # Steps to the environment and plots the observation with the desired and the current fingertip poses
-    def plot_single_step(self, current_state, next_state):
+    def plot_single_step(self, current_state, next_state, ik_fingertip_poses=None):
         
         # Render the environment and get the first image 
         action = np.concatenate([current_state, np.zeros(7)], axis=0)
@@ -241,10 +282,17 @@ class FingertipIKTester:
             features = next_state,
             endeff_pose = 'current_pose' # We are not moving the end effector for now so everything should be wrt the current pose
         )
+        if not ik_fingertip_poses is None:
+            ik_fingertip_poses = self.env.get_projected_poses(
+                poses = ik_fingertip_poses, 
+                endeff_pose = 'current_pose'
+            )
+
         img = self.record_fingertip_poses(
             obs = obs, 
             current_fingertip_poses = current_fingertip_poses,
-            desired_fingertip_poses = desired_fingertip_poses
+            desired_fingertip_poses = desired_fingertip_poses,
+            ik_fingertip_poses = ik_fingertip_poses
         )
 
         return img
@@ -286,10 +334,10 @@ class FingertipIKTester:
     def record_fingertip_poses(self,
                                obs,
                                current_fingertip_poses,
-                               desired_fingertip_poses=None):
+                               desired_fingertip_poses=None,
+                               ik_fingertip_poses=None):
         
         from third_person_man.utils import plot_axes
-
         
         fingertips_2d_used = []
         for finger_id, finger_type in enumerate(['index', 'middle', 'ring', 'thumb']):
@@ -310,5 +358,12 @@ class FingertipIKTester:
                 if finger_type in self.desired_finger_types:
                     desired_ft_poses_used.append(desired_fingertip_poses[finger_id])
             img = plot_axes(axes=desired_ft_poses_used, img=img, color_set=2)
+
+        if not ik_fingertip_poses is None:
+            used_ik_ft_poses = []
+            for finger_id, finger_type in enumerate(['index', 'middle', 'ring', 'thumb']):
+                if finger_type in self.desired_finger_types:
+                    used_ik_ft_poses.append(ik_fingertip_poses[finger_id])
+            img = plot_axes(axes=used_ik_ft_poses, img=img, color_set=3)
 
         return img

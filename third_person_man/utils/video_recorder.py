@@ -25,4 +25,4 @@ class VideoRecorder:
 
     def save(self, file_name):
         path = self.save_dir / file_name
-        imageio.mimsave(str(path), self.frames, fps=self.fps)
+        imageio.mimsave(str(path), self.frames, fps = self.fps)
