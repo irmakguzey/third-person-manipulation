@@ -3,6 +3,7 @@ import os
 import glob 
 import time
 import hydra 
+import pickle
 import numpy as np
 import cv2, PIL
 from cv2 import aruco
@@ -21,6 +22,8 @@ from tqdm import tqdm
 from holobot.robot.kinova import KinovaArm
 from holobot.robot.allegro.allegro import AllegroHand
 from holobot.robot.allegro.allegro_kdl import AllegroKDL
+from third_person_man.utils import get_path_in_package
+from third_person_man.kinematics import FingertipIKSolver
 from third_person_man.utils import VideoRecorder
 
 
@@ -38,6 +41,7 @@ class BaseframeReplay():
         self.ratio_list = []
 
         self.save_dir = cfg.save_dir
+        self.replay_dir = cfg.replay_dir
         self.host = cfg.host
         self.port = cfg.port
         self.calibr_duration = cfg.calibr_duration
@@ -49,6 +53,10 @@ class BaseframeReplay():
         self.arm = KinovaArm()
         self.hand = AllegroHand()
         self.hand_solver = AllegroKDL()
+        self.solver = FingertipIKSolver(
+            urdf_path = get_path_in_package('kinematics/assets/allegro_hand_right.urdf'),
+            desired_finger_types= ['index', 'middle', 'ring', 'thumb']
+        )
 
         self.video_recorder = VideoRecorder(
             save_dir = Path(self.save_dir),
@@ -218,6 +226,23 @@ class BaseframeReplay():
             fingertip_poses_to_camera.append([finger_rvec,finger_tvec])
 
         return fingertip_poses_to_camera
+    
+    def finger_to_hand(self, finger_rvec, finger_tvec, hand_rvec, hand_tvec): # This is the reverse function of finger_tips
+        # Given finger to camera and hand to camera, returns finger to hand H_F_E
+        rotation_hand_to_camera, _ = cv2.Rodrigues(hand_rvec)
+        rotation_hand_to_camera = np.hstack((rotation_hand_to_camera, hand_tvec.reshape(3,1)))
+        rotation_hand_to_camera = np.vstack((rotation_hand_to_camera, np.array([0, 0, 0, 1])))
+        rotation_camera_to_hand = np.linalg.inv(rotation_hand_to_camera)
+
+        H_F_O, _ = cv2.Rodrigues(finger_rvec)
+        H_F_O = np.hstack((H_F_O, finger_tvec.reshape(3,1)))
+        H_F_O = np.vstack((H_F_O, np.array([0, 0, 0, 1])))
+
+        H_F_E = np.dot(rotation_camera_to_hand, H_F_O)
+
+        return H_F_E
+
+
 
 
 
@@ -400,23 +425,87 @@ class BaseframeReplay():
         hand_rvec, hand_tvec = self.hand_position(eef_rvec, eef_tvec)
         # Get the predicted fingertip orientation
         fingertip_poses = self.finger_tips(hand_rvec, hand_tvec)
-        print(fingertip_poses)
-        for finger in fingertip_poses: 
-            frame_axis = cv2.drawFrameAxes(frame_axis.copy(), self.camera_intrinsics, self.distortion_coefficients, finger[0], finger[1], 0.01)
+        eef_pose = [eef_rvec, eef_tvec]
+        
             
-        return frame_axis
+        return fingertip_poses, eef_pose, frame_axis
 
     def save_fingertip_trajectory(self):
         start_time = time.time()
         time_step = 0
+        fingertip_frames = []
+        eef_frames = []
         while time.time() - start_time < self.test_duration:
-            img  = self.test_fingertip_calibr()
+            fingertip_poses, eef_pose, frame_axis  = self.test_fingertip_calibr()
+            fingertip_frames.append(fingertip_poses)
+            eef_frames.append(eef_pose)
+            for finger in fingertip_poses: 
+                frame_axis = cv2.drawFrameAxes(frame_axis.copy(), self.camera_intrinsics, self.distortion_coefficients, finger[0], finger[1], 0.01)
             print('Getting fingertip positions!')
             if time_step == 0: 
-                self.video_recorder.init(obs=img)
+                self.video_recorder.init(obs=frame_axis)
             time_step += 1
-            self.video_recorder.record_realsense(img)
+            self.video_recorder.record_realsense(frame_axis)
+        
+        frames = {}
+        frames['fingertip'] = fingertip_frames
+        frames['eef'] = eef_frames
 
         self.video_recorder.save('fingertip_trajectory.mp4')
+        file_path = self.save_dir +'/fingertip_poses.pkl'
+        with open(file_path, 'wb') as file:
+            pickle.dump(frames, file)
 
+
+    def ik_replay_on_real_robot(self): # This tests the inverse kinematics of current setup
+        fingertip_file = self.replay_dir + '/fingertip_poses.pkl'
+        with open(fingertip_file, 'rb') as file:
+            poses = pickle.load(file)
+        fingertip_poses = poses['fingertip']
+        eef_poses = poses['eef']
+        print('Number of replay frames: {}'.format(len(fingertip_poses)))
+        # print('eef poses: {}'.format(eef_poses))
+
+        joint_commands = []
+        desired_finger_position = []
+        for frame in range(len(fingertip_poses)):
+            four_fingers = []
+            fingertips = fingertip_poses[frame]
+            eef_rvec, eef_tvec = eef_poses[frame]
+            print('\n')
+            print(fingertips)
+            # Get hand orientation
+            hand_rvec, hand_tvec = self.hand_position(eef_rvec, eef_tvec)
+            # Calculate the finger_to_hand_rvec, finger_to_hand_tvec
+            for i, finger_type in enumerate(['index', 'middle', 'ring', 'thumb']):
+                finger_to_hand_frame = self.finger_to_hand(fingertips[i][0], fingertips[i][1], hand_rvec, hand_tvec)
+                four_fingers.append(finger_to_hand_frame)
+
+            # Pass the pose into inverse kinematics
+            hand_action, _, errors, _, _ = self.solver.move_to_pose(
+                    poses = four_fingers,
+                    demo_action = None)
+            
+            desired_finger_position.append(four_fingers)
+            joint_commands.append(hand_action)
+
+            
+            # Perform inverse kinematics, get and record joint commands
+
+
+
+
+
+        
+        
+
+        return desired_finger_position, joint_commands
+
+
+
+
+        # Then: (as a test) get the current cur_eef_rvec, cur_eef_tvec of the end effector
+
+
+        # Apply change to current end effector to get gt_finger_poses (ground_truth)
 

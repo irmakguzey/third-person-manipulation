@@ -25,17 +25,18 @@ base_calibr:
   translation_ratio: 0.22                                      # translation in camera frame / translation in robot fr
   host: '172.24.71.220'
   port: 10005
-  save_dir: /media/data/third_person_man/base_frame/20
   calibr_duration: 15
   test_duration: 30
-  # rvec_calibr: [[2.1753, 0.011, -0.0483]] 
-  # tvec_calibr: [[0, -0.0205, 0.1966]]
-  tvec_calibr: None
-  rvec_calibr: None
+  rvec_calibr: [[2.1737, 0.00045, -0.05424]] 
+  tvec_calibr: [[0, -0.02504, 0.20834]]
+  # tvec_calibr: None
+  # rvec_calibr: None
   eef_to_hand: [[1,0,0,0],
                 [0,1,0,0],
                 [0,0,1,0],
                 [0,0,0,1]]
+  save_dir: /media/data/third_person_man/base_frame/22
+  replay_dir: /media/data/third_person_man/base_frame/22
 
 fingertip_ik_replay:
   data_path: /data/third_person_manipulation/sim_cube_flipping

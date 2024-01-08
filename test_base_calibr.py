@@ -9,9 +9,10 @@ def baseframe_replay(cfg):
     baseframe_replay = BaseframeReplay(
         cfg = cfg
     )
-    baseframe_replay.save_baseframe_trajectory()
+    # baseframe_replay.save_baseframe_trajectory()
     # baseframe_replay.save_end_effector_trajectory()
-    baseframe_replay.save_fingertip_trajectory()
+    # baseframe_replay.save_fingertip_trajectory()
+    baseframe_replay.ik_replay_on_real_robot()
 
 
 @hydra.main(version_base=None, config_path='configs', config_name='testing')
